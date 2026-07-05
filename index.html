@@ -317,12 +317,26 @@
         </div>
         <div class="field"><label>Choisis ton ou tes jeu(x) *</label><div class="game-pick" id="gamePick"></div></div>
         <div id="priceRecap"></div>
+        <div class="notice" style="margin-top:16px;font-size:12.5px;line-height:1.7">
+          📄 <b>Documents à télécharger</b>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
+            <a href="docs/reglement-shoken-cup.pdf" target="_blank" rel="noopener" style="color:var(--cyan);text-decoration:underline;text-decoration-style:dotted">📘 Règlement de la compétition (à lire avant de t'inscrire)</a>
+            <a href="docs/autorisation-parentale.pdf" target="_blank" rel="noopener" style="color:var(--jaune);text-decoration:underline;text-decoration-style:dotted">📝 Autorisation parentale de participation (mineurs)</a>
+            <a href="docs/autorisation-droit-image-mineur.pdf" target="_blank" rel="noopener" style="color:var(--jaune);text-decoration:underline;text-decoration-style:dotted">📸 Autorisation d'exploitation du droit à l'image (mineurs)</a>
+          </div>
+          <div class="sub" style="font-size:11.5px;margin-top:8px"><b>Participants mineurs :</b> imprime et fais signer les deux autorisations par ton représentant légal, et présente-les à l'organisation le jour de l'événement (avec les pièces demandées).</div>
+        </div>
         <div class="notice" style="margin-top:16px;font-size:12px;line-height:1.6">
           🔒 <b>Tes données personnelles</b> — Les informations de ce formulaire sont collectées par l'organisation du tournoi, uniquement pour gérer les inscriptions, le déroulement des matchs et le classement de la ligue. Elles ne sont ni vendues ni transmises à des tiers. <b style="color:var(--jaune)">Ton pseudo et tes résultats seront affichés publiquement</b> (brackets, classements, palmarès) ; tes nom, e-mail et téléphone restent visibles de la seule organisation. Tu peux annuler ton inscription à tout moment via ton code personnel (page « Mon inscription ») ou demander la suppression de tes données en contactant l'organisation. <b>Les joueurs mineurs</b> doivent disposer d'une autorisation parentale.
+          <div style="margin-top:10px">📸 <b>Droit à l'image</b> — Le tournoi fait l'objet de captations vidéo, de streamings en direct, de replays et de photographies, susceptibles d'être diffusés par Cyberfun et l'ASBTP. Les conditions détaillées figurent dans le règlement de l'événement. <b>Pour les participants mineurs</b>, l'autorisation relative au droit à l'image doit être donnée par le représentant légal : une <b>autorisation parentale écrite</b> est requise (modèles téléchargeables ci-dessus) et devra être remise à l'organisation au plus tard le jour de l'événement.</div>
         </div>
         <label style="display:flex;align-items:flex-start;gap:10px;margin-top:12px;cursor:pointer;font-size:13px">
           <input type="checkbox" name="consent" required style="width:18px;height:18px;margin-top:1px;accent-color:var(--jaune);flex-shrink:0">
           <span>J'ai lu et j'accepte l'utilisation de mes données décrite ci-dessus, et je consens à l'affichage public de mon pseudo et de mes résultats. *</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;margin-top:10px;cursor:pointer;font-size:13px">
+          <input type="checkbox" name="consentImage" required style="width:18px;height:18px;margin-top:1px;accent-color:var(--jaune);flex-shrink:0">
+          <span>J'accepte les conditions relatives au droit à l'image. Je certifie être <b>majeur</b>, ou être le <b>représentant légal</b> du participant mineur (ou m'inscrire avec son accord, l'autorisation parentale écrite faisant foi). J'autorise expressément Cyberfun et l'ASBTP à fixer, utiliser et diffuser l'image du participant (captations vidéo, streamings live, replays et photographies) réalisée dans le cadre du tournoi, pour une durée de 20 ans dans le monde entier, conformément aux termes détaillés dans le règlement de l'événement. *</span>
         </label>
         <div class="cta-row"><button type="submit" class="btn" id="regSubmitBtn">Valider mon inscription ▸</button></div>
       </form>
@@ -1073,13 +1087,14 @@ async function handleRegister(e){
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailRaw)) return toast("E-mail invalide.",true);
   if(!games.length) return toast("Choisis au moins un jeu !",true);
   if(!f.querySelector('input[name=consent]')?.checked) return toast("Merci de cocher la case de consentement pour t'inscrire.",true);
+  if(!f.querySelector('input[name=consentImage]')?.checked) return toast("Merci d'accepter les conditions relatives au droit à l'image pour t'inscrire.",true);
   const targetEvent = evPubId();
   // doublon : un même e-mail ne peut s'inscrire deux fois AU MÊME événement (mais peut s'inscrire à d'autres)
   if(regs.some(r=>r.eventId===targetEvent && r.email&&r.email.toLowerCase()===emailRaw.toLowerCase())) return toast("Cet e-mail est déjà inscrit à cet événement.",true);
   const code=genCode();
   const price=Number(pubConfig().pricePerGame)||0;
   const amount=+(price*games.length).toFixed(2);
-  const reg={id:code,code,eventId:targetEvent,pseudo,prenom,nom,age,ville,email:emailRaw,telephone:tel,games,ts:Date.now(),amount,paid:amount===0,consent:true};
+  const reg={id:code,code,eventId:targetEvent,pseudo,prenom,nom,age,ville,email:emailRaw,telephone:tel,games,ts:Date.now(),amount,paid:amount===0,consent:true,consentImage:true};
   try{
     await saveReg(reg);
     localStorage.setItem("fgc_myCode",code);
