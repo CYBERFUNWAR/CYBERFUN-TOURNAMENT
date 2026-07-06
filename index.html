@@ -2734,7 +2734,7 @@ function renderAdminAll(){
   ["ins","brk","lig","set"].forEach(t=>$("#atab-"+t).classList.toggle("hidden",t!==curAtab));
   const fg=$("#filterGame");if(fg)fg.innerHTML='<option value="">Tous les jeux</option>'+config.games.map(g=>`<option>${esc(g)}</option>`).join("");
   const bg=$("#brkGame");if(bg){const cur=bg.value;bg.innerHTML=config.games.map(g=>`<option>${esc(g)}</option>`).join("");if(cur&&config.games.includes(cur))bg.value=cur;adminBrkGame=bg.value;const bk=getBk(adminBrkGame);if(bk){setFmt(bk.type);$("#brkFT").value=String(bk.ft);}}
-  const lg=$("#adminLigueGame");if(lg){const cur=lg.value;lg.innerHTML=config.games.map(g=>`<option>${esc(g)}</option>`).join("");if(cur&&config.games.includes(cur))lg.value=cur;adminLigueGame=lg.value;}
+  const lg=$("#adminLigueGame");if(lg){const cur=lg.value;const allGames=[...new Set([...config.games,...seasons.map(s=>s.game)])];lg.innerHTML=allGames.map(g=>`<option>${esc(g)}</option>`).join("");if(cur&&allGames.includes(cur))lg.value=cur;adminLigueGame=lg.value;}
   if(curAtab==="ins")renderAdminTable();
   if(curAtab==="brk")renderAdminBracket();
   if(curAtab==="lig" && isFullAdmin())renderAdminLigue();
