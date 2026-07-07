@@ -659,6 +659,7 @@ const DEFAULT_CONFIG={ title:"NEON VS CLASH", subtitle:"Fighting Game Tournament
   pricePerGame:0, paymentLink:"" };
 
 let config={...DEFAULT_CONFIG}, regs=[], brackets={}, seasons=[];
+let configLoaded=false; // vrai config reçue (Firestore ou cache local) — évite le flash « NEON VS CLASH »
 let events=[], currentEventId=null;  // multi-événements : liste + événement actif (admin)
 let isAdmin=false, curAtab="ins", pubBracketGame=null, adminBrkGame=null, genFormat="single";
 let pubLigueGame=null, adminLigueGame=null, adminLigueYear=new Date().getFullYear();
@@ -755,7 +756,9 @@ if(location.hash==="#moi") setTimeout(routeHash,0);
 
 async function boot(){
   setupNav(); bindForm();
-  if(DEMO){ setLiveMode("demo"); demoLoad(); renderAll(); return; }
+  if(DEMO){ setLiveMode("demo"); demoLoad(); configLoaded=true; renderAll(); return; }
+  // dernière config connue (cache local) : brandé instantanément pour les visiteurs récurrents
+  { const cc=LS.get("cfgCache"); if(cc){ config={...DEFAULT_CONFIG,...cc}; configLoaded=true; } }
   try{
     const app=initializeApp(cfg); db=getFirestore(app); auth=getAuth(app);
     // persistance durable de la session admin sur l'origine du site : sans ça, certains
@@ -763,7 +766,7 @@ async function boot(){
     // retombent en mémoire et déconnectent l'admin à chaque rechargement de page.
     try{ await setPersistence(auth, indexedDBLocalPersistence); }
     catch(e){ try{ await setPersistence(auth, browserLocalPersistence); }catch(_){ /* dernier recours : défaut SDK */ } }
-    onSnapshot(doc(db,"app","config"),snap=>{ config={...DEFAULT_CONFIG,...(snap.exists()?snap.data():{})}; renderHeader(); renderHome(); renderGamePick(); if(isAdmin&&curAtab==="set")renderSettings(); }, ()=>setLiveMode("off"));
+    onSnapshot(doc(db,"app","config"),snap=>{ const cd=snap.exists()?snap.data():{}; config={...DEFAULT_CONFIG,...cd}; configLoaded=true; LS.set("cfgCache",cd); renderHeader(); renderHome(); renderGamePick(); if(isAdmin&&curAtab==="set")renderSettings(); }, ()=>setLiveMode("off"));
     onSnapshot(doc(db,"app","sponsors"),snap=>{ globalSponsors=(snap.exists()&&snap.data().list)||[]; renderHome(); }, ()=>{ /* lecture publique */ });
     onSnapshot(query(collection(db,"events")),snap=>{
       events=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
@@ -892,10 +895,37 @@ async function saveGlobalSponsors(){ if(DEMO){LS.set("gsponsors",globalSponsors)
 async function evtSave(ev){ if(DEMO){const i=events.findIndex(x=>x.id===ev.id);i>=0?events[i]=ev:events.push(ev);LS.set("events",events);demoRender();} else { await setDoc(doc(db,"events",ev.id),ev); } }
 async function evtRemove(id){ if(DEMO){events=events.filter(x=>x.id!==id);LS.set("events",events);demoRender();} else { await deleteDoc(doc(db,"events",id)); } }
 async function saveReg(r){ if(DEMO){const i=regs.findIndex(x=>x.id===r.id);i>=0?regs[i]=r:regs.push(r);LS.set("regs",regs);demoRender();} else { await setDoc(doc(db,"registrations",r.id),r); } }
-async function removeReg(id){ if(DEMO){regs=regs.filter(x=>x.id!==id);LS.set("regs",regs);demoRender();} else { await deleteDoc(doc(db,"registrations",id)); } }
+async function removeReg(id){ if(DEMO){regs=regs.filter(x=>x.id!==id);LS.set("regs",regs);demoRender();} else {
+  let old=null; try{ const s0=await getDoc(doc(db,"registrations",id)); if(s0.exists()) old=s0.data(); }catch(e){}
+  await deleteDoc(doc(db,"registrations",id));
+  if(old) await freeClaims(old.eventId, old.email, old.pseudo); // libère e-mail + pseudo pour une future réinscription
+} }
 async function fetchRegByCode(code){
   if(DEMO){ return regs.find(r=>r.id===code)||null; }
   try{ const s=await getDoc(doc(db,"registrations",code)); return s.exists()?{id:s.id,...s.data()}:null; }catch(e){ return null; }
+}
+
+/* ---------- ANTI-DOUBLON : « réservations » d'unicité (collection regClaims) ----------
+   Le public ne peut pas LISTER les inscriptions (protection des e-mails), donc on ne peut
+   pas détecter un doublon en parcourant la liste. À la place : pour chaque inscription, on
+   crée 2 petits documents "réservation" à identifiant DÉTERMINISTE (hash e-mail / pseudo,
+   par événement). Le public peut consulter unitairement (get) et créer, jamais lister.
+   Un doublon = la réservation existe déjà → refus avec message clair. */
+function _cHash(v){ v=(v||"").trim().toLowerCase(); let x=5381; for(const c of v) x=(((x<<5)+x)+c.charCodeAt(0))>>>0; return x.toString(36)+"_"+v.length; }
+function claimIds(eventId,email,pseudo){
+  const em=(email||"").trim(), ps=(pseudo||"").trim();
+  return { em: em?`${eventId}__em_${_cHash(em)}`:null, ps: ps?`${eventId}__ps_${_cHash(ps)}`:null };
+}
+async function claimExists(id){ if(!id) return false; try{ const s=await getDoc(doc(db,"regClaims",id)); return s.exists(); }catch(e){ return false; } }
+async function createClaims(eventId,email,pseudo,code){
+  const c=claimIds(eventId,email,pseudo);
+  if(c.em) await setDoc(doc(db,"regClaims",c.em),{t:"em",code,ts:Date.now()});
+  if(c.ps) await setDoc(doc(db,"regClaims",c.ps),{t:"ps",code,ts:Date.now()});
+}
+async function freeClaims(eventId,email,pseudo){
+  const c=claimIds(eventId,email,pseudo);
+  if(c.em){ try{ await deleteDoc(doc(db,"regClaims",c.em)); }catch(e){} }
+  if(c.ps){ try{ await deleteDoc(doc(db,"regClaims",c.ps)); }catch(e){} }
 }
 async function saveBracket(game,data){ const key=bkKey(currentEventId,game); if(DEMO){brackets[key]=data;LS.set("brackets",brackets);demoRender();} else { await setDoc(doc(db,"brackets",key),data); } }
 async function saveSeason(season){ if(DEMO){const i=seasons.findIndex(x=>x.id===season.id);i>=0?seasons[i]=season:seasons.push(season);LS.set("seasons",seasons);demoRender();} else { await setDoc(doc(db,"seasons",season.id),season); } }
@@ -942,7 +972,13 @@ function go(view){
 }
 
 function renderHeader(){
-  $("#brand").innerHTML=esc(config.title||"NEON VS CLASH").replace(/\sVS\s/i,' <span class="vs">VS</span> ');
+  if(!configLoaded){ // config pas encore reçue : en-tête neutre (pas de flash du titre d'usine)
+    $("#brand").textContent=""; $("#tagline").textContent="";
+    $("#logoImg").classList.add("hidden");
+    document.title="Cyber Bracket Editor";
+    return;
+  }
+  $("#brand").innerHTML=esc(config.title||"").replace(/\sVS\s/i,' <span class="vs">VS</span> ');
   $("#tagline").textContent=config.subtitle||"";
   const img=$("#logoImg");
   if(config.logo && /^https?:\/\//i.test(config.logo)){ img.src=config.logo; img.classList.remove("hidden"); img.onerror=()=>img.classList.add("hidden"); }
@@ -1089,19 +1125,33 @@ async function handleRegister(e){
   if(!f.querySelector('input[name=consent]')?.checked) return toast("Merci de cocher la case de consentement pour t'inscrire.",true);
   if(!f.querySelector('input[name=consentImage]')?.checked) return toast("Merci d'accepter les conditions relatives au droit à l'image pour t'inscrire.",true);
   const targetEvent = evPubId();
-  // doublon : un même e-mail ne peut s'inscrire deux fois AU MÊME événement (mais peut s'inscrire à d'autres)
-  if(regs.some(r=>r.eventId===targetEvent && r.email&&r.email.toLowerCase()===emailRaw.toLowerCase())) return toast("Cet e-mail est déjà inscrit à cet événement.",true);
+  // doublons — contrôle local (efficace pour le staff connecté qui voit la liste)
+  if(regs.some(r=>r.eventId===targetEvent && r.email&&r.email.toLowerCase()===emailRaw.toLowerCase())) return toast("Cet e-mail est déjà inscrit à cet événement. Retrouve ta fiche via « Mon inscription » avec ton code.",true);
+  if(regs.some(r=>r.eventId===targetEvent && (r.pseudo||"").trim().toLowerCase()===pseudo.toLowerCase())) return toast("Ce pseudo est déjà pris sur cet événement — choisis-en un autre.",true);
+  // doublons — contrôle via réservations (fonctionne pour les visiteurs, qui ne voient pas la liste)
+  if(!DEMO){
+    const c=claimIds(targetEvent,emailRaw,pseudo);
+    if(await claimExists(c.em)) return toast("Cet e-mail est déjà inscrit à cet événement. Retrouve ta fiche via « Mon inscription » avec ton code.",true);
+    if(await claimExists(c.ps)) return toast("Ce pseudo est déjà pris sur cet événement — choisis-en un autre.",true);
+  }
   const code=genCode();
   const price=Number(pubConfig().pricePerGame)||0;
   const amount=+(price*games.length).toFixed(2);
   const reg={id:code,code,eventId:targetEvent,pseudo,prenom,nom,age,ville,email:emailRaw,telephone:tel,games,ts:Date.now(),amount,paid:amount===0,consent:true,consentImage:true};
+  if(window._regBusy) return; window._regBusy=true; // anti double-clic sur « Valider »
   try{
+    if(!DEMO) await createClaims(targetEvent,emailRaw,pseudo,code); // réserver e-mail + pseudo d'abord
     await saveReg(reg);
     localStorage.setItem("fgc_myCode",code);
     f.reset(); toast("Inscription validée ! 🎮");
     const emailed=await sendConfirmEmail(reg);
     $("#lookupCode").value=code; go("moi"); showMyCard(reg,true,emailed);
-  }catch(err){ console.error(err); toast("Erreur d'enregistrement.",true); }
+  }catch(err){
+    console.error(err);
+    if(!DEMO) freeClaims(targetEvent,emailRaw,pseudo); // nettoyage best-effort
+    // une réservation déjà prise ressort en refus de permission → message doublon explicite
+    toast(String(err&&err.code)==="permission-denied" ? "Inscription impossible : e-mail ou pseudo déjà utilisé sur cet événement." : "Erreur d'enregistrement.",true);
+  } finally { window._regBusy=false; }
 }
 
 /* e-mail de confirmation via EmailJS (optionnel) */
@@ -2805,6 +2855,9 @@ async function editReg(id){const r=regs.find(x=>x.id===id);if(!r)return;
   const telephone=prompt("Téléphone :",r.telephone);if(telephone===null)return;
   const games=prompt("Jeux (virgules)\nDispo : "+config.games.join(", "),r.games.join(", "));if(games===null)return;
   await saveReg({...r,pseudo:pseudo.trim(),prenom:prenom.trim(),nom:nom.trim(),age:age.trim(),ville:ville.trim(),email:email.trim(),telephone:telephone.trim(),games:games.split(",").map(s=>s.trim()).filter(Boolean)});
+  if(!DEMO && ((r.email||"")!==email.trim() || (r.pseudo||"")!==pseudo.trim())){
+    try{ await freeClaims(r.eventId,r.email,r.pseudo); await createClaims(r.eventId,email.trim(),pseudo.trim(),r.code||r.id); }catch(e){ console.error(e); }
+  }
   toast("Inscription modifiée.");}
 function exportCSV(){
   const head=["Pseudo","Prénom","Nom","Âge","Ville","Email","Téléphone","Code","Jeux","Présent","Montant","Payé"];
@@ -3045,11 +3098,15 @@ async function addPlayerManual(){
   if(games===null)return;
   const gl=games.split(",").map(s=>s.trim()).filter(Boolean);
   if(!gl.length)return toast("Indique au moins un jeu.",true);
+  // doublons sur l'événement courant (le staff voit la liste)
+  if((email||"").trim() && regs.some(r=>r.eventId===currentEventId && r.email && r.email.toLowerCase()===email.trim().toLowerCase())) return toast("Cet e-mail est déjà inscrit à cet événement.",true);
+  if(regs.some(r=>r.eventId===currentEventId && (r.pseudo||"").trim().toLowerCase()===pseudo.trim().toLowerCase())) return toast("Ce pseudo est déjà pris sur cet événement.",true);
   const code=genCode();
   const price=Number(config.pricePerGame)||0;
   const amount=+(price*gl.length).toFixed(2);
   // par défaut un ajout admin = présent sur place, donc paid:true. À décocher si à régler.
   await saveReg({id:code,code,eventId:currentEventId,pseudo:pseudo.trim(),prenom:prenom.trim(),nom:nom.trim(),age:age.trim(),ville:ville.trim(),email:email.trim(),telephone:telephone.trim(),games:gl,ts:Date.now(),amount,paid:true});
+  if(!DEMO){ try{ await createClaims(currentEventId,email.trim(),pseudo.trim(),code); }catch(e){ console.error(e); } }
   toast("Joueur ajouté (code "+code+").");
 }
 
