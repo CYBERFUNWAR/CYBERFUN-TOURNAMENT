@@ -768,7 +768,7 @@ async function boot(){
     onSnapshot(query(collection(db,"events")),snap=>{
       events=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
       ensureEventsSeed();
-      renderHeader(); renderHome();
+      renderHeader(); renderHome(); renderGamePick(); renderPubBracketTabs();
       if(isAdmin) renderEventBar();
     }, ()=>{ /* lecture publique events */ });
     onSnapshot(query(collection(db,"registrations")),snap=>{
