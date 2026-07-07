@@ -758,7 +758,8 @@ async function boot(){
   setupNav(); bindForm();
   if(DEMO){ setLiveMode("demo"); demoLoad(); configLoaded=true; renderAll(); return; }
   // dernière config connue (cache local) : brandé instantanément pour les visiteurs récurrents
-  { const cc=LS.get("cfgCache"); if(cc){ config={...DEFAULT_CONFIG,...cc}; configLoaded=true; } }
+  // (accès localStorage direct : l'utilitaire LS est déclaré plus bas dans le fichier)
+  try{ const cc=JSON.parse(localStorage.getItem("fgc_cfgCache")||"null"); if(cc){ config={...DEFAULT_CONFIG,...cc}; configLoaded=true; } }catch(e){}
   try{
     const app=initializeApp(cfg); db=getFirestore(app); auth=getAuth(app);
     // persistance durable de la session admin sur l'origine du site : sans ça, certains
