@@ -546,6 +546,7 @@
           <button class="btn ghost sm" onclick="cleanOrphanRegs()">🧹 Nettoyer les inscriptions orphelines</button>
           <button class="btn ghost sm" onclick="exportBackup()">💾 Sauvegarde complète (JSON)</button>
           <button class="btn ghost sm" onclick="$('#restoreFile').click()">📥 Restaurer une sauvegarde</button>
+          <button class="btn ghost sm" onclick="rebuildClaims()" title="Répare la protection anti-doublon pour les inscriptions existantes (à lancer après une restauration)">🛡 Reconstruire les réservations anti-doublon</button>
           <input type="file" id="restoreFile" accept=".json,application/json" style="display:none" onchange="importBackup(this.files[0])">
           <p class="sub" style="font-size:12px;margin-top:8px">La sauvegarde télécharge TOUTES tes données (événements, inscriptions, brackets, ligue, sponsors) dans un fichier. Fais-en une régulièrement, surtout avant/après chaque tournoi. La restauration réécrit les données du fichier dans l'appli (les éléments portant le même identifiant sont remplacés ; ceux créés après la sauvegarde sont conservés).</p>
           <div id="orphanInfo" class="sub" style="font-size:12px;margin-top:8px"></div>
@@ -647,7 +648,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, query }
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, updateDoc, increment, collection, onSnapshot, query }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, indexedDBLocalPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -778,6 +779,7 @@ async function boot(){
     onSnapshot(query(collection(db,"registrations")),snap=>{
       regs=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.ts||0)-(b.ts||0));
       renderHome(); setLiveMode("on",true); if(isAdmin&&curAtab==="ins")renderAdminTable();
+      healCounters(); // staff : recale les compteurs publics si besoin (auto-réparation)
     }, ()=>{ /* visiteur non-admin : list interdit, normal */ });
     onSnapshot(query(collection(db,"brackets")),snap=>{
       brackets={}; snap.docs.forEach(d=>brackets[d.id]=d.data());
@@ -899,7 +901,7 @@ async function saveReg(r){ if(DEMO){const i=regs.findIndex(x=>x.id===r.id);i>=0?
 async function removeReg(id){ if(DEMO){regs=regs.filter(x=>x.id!==id);LS.set("regs",regs);demoRender();} else {
   let old=null; try{ const s0=await getDoc(doc(db,"registrations",id)); if(s0.exists()) old=s0.data(); }catch(e){}
   await deleteDoc(doc(db,"registrations",id));
-  if(old) await freeClaims(old.eventId, old.email, old.pseudo); // libère e-mail + pseudo pour une future réinscription
+  if(old){ await freeClaims(old.eventId, old.email, old.pseudo); bumpCounters(old.eventId, old.games, -1); } // libère e-mail/pseudo + compteur
 } }
 async function fetchRegByCode(code){
   if(DEMO){ return regs.find(r=>r.id===code)||null; }
@@ -928,6 +930,55 @@ async function freeClaims(eventId,email,pseudo){
   if(c.em){ try{ await deleteDoc(doc(db,"regClaims",c.em)); }catch(e){} }
   if(c.ps){ try{ await deleteDoc(doc(db,"regClaims",c.ps)); }catch(e){} }
 }
+/* Reconstruit les réservations pour TOUTES les inscriptions existantes (staff).
+   Utile après une mise à jour de l'appli ou une restauration de sauvegarde :
+   les inscriptions créées sans réservations redeviennent protégées. */
+async function rebuildClaims(){
+  if(DEMO) return toast("Mode démo : rien à reconstruire.",true);
+  if(!requireAdmin()) return;
+  let done=0, errs=0;
+  for(const r of regs){
+    try{ await createClaims(r.eventId, r.email, r.pseudo, r.code||r.id); done++; }
+    catch(e){ errs++; console.error("claim",r.id,e); }
+  }
+  toast(errs ? `Réservations : ${done} OK, ${errs} erreur(s) — voir console.` : `Réservations reconstruites pour ${done} inscription(s) ✓`, !!errs);
+}
+window.rebuildClaims=rebuildClaims;
+
+/* ---------- COMPTEURS PUBLICS ----------
+   Les visiteurs ne peuvent pas lire la liste des inscriptions (protection des e-mails) :
+   leurs compteurs proviennent de champs agrégés SANS donnée personnelle stockés sur
+   l'événement (regCount, partCount, regCountByGame), mis à jour à chaque inscription
+   ou annulation. Le staff, lui, voit les comptes exacts calculés depuis la liste. */
+function pubRegCount(eid){ if(isAdmin) return regs.filter(r=>(r.eventId||null)===eid).length;
+  const e=events.find(x=>x.id===eid); return (e&&typeof e.regCount==="number"&&e.regCount>0)?e.regCount:0; }
+function pubGameCount(eid,g){ if(isAdmin) return regs.filter(r=>(r.eventId||null)===eid&&r.games&&r.games.includes(g)).length;
+  const e=events.find(x=>x.id===eid); return (e&&e.regCountByGame&&typeof e.regCountByGame[g]==="number"&&e.regCountByGame[g]>0)?e.regCountByGame[g]:0; }
+function pubPartCount(eid){ if(isAdmin) return regs.filter(r=>(r.eventId||null)===eid).reduce((a,r)=>a+((r.games&&r.games.length)||0),0);
+  const e=events.find(x=>x.id===eid); return (e&&typeof e.partCount==="number"&&e.partCount>0)?e.partCount:0; }
+/* staff : vérifie et corrige les compteurs publics de chaque événement (exact = liste réelle) */
+let _healBusy=false;
+async function healCounters(){
+  if(DEMO||!isAdmin||_healBusy) return; _healBusy=true;
+  try{
+    for(const e of events){
+      const evRegs=regs.filter(r=>(r.eventId||null)===e.id);
+      const rc=evRegs.length, pc=evRegs.reduce((a,r)=>a+((r.games&&r.games.length)||0),0);
+      const byG={}; evRegs.forEach(r=>(r.games||[]).forEach(g=>byG[g]=(byG[g]||0)+1));
+      const cur=e.regCountByGame||{};
+      const sameG = Object.keys({...byG,...cur}).every(g=>(byG[g]||0)===(cur[g]||0));
+      if(e.regCount!==rc || e.partCount!==pc || !sameG){
+        try{ await updateDoc(doc(db,"events",e.id),{regCount:rc,partCount:pc,regCountByGame:byG}); }catch(err){ console.error("heal",e.id,err); }
+      }
+    }
+  } finally { _healBusy=false; }
+}
+async function bumpCounters(eventId,games,delta){
+  if(DEMO||!eventId) return;
+  const upd={regCount:increment(delta),partCount:increment(delta*((games&&games.length)||0))};
+  (games||[]).forEach(g=>{ upd["regCountByGame."+g]=increment(delta); });
+  try{ await updateDoc(doc(db,"events",eventId),upd); }catch(e){ console.error("compteurs",e); }
+}
 async function saveBracket(game,data){ const key=bkKey(currentEventId,game); if(DEMO){brackets[key]=data;LS.set("brackets",brackets);demoRender();} else { await setDoc(doc(db,"brackets",key),data); } }
 async function saveSeason(season){ if(DEMO){const i=seasons.findIndex(x=>x.id===season.id);i>=0?seasons[i]=season:seasons.push(season);LS.set("seasons",seasons);demoRender();} else { await setDoc(doc(db,"seasons",season.id),season); } }
 async function removeSeason(id){ if(DEMO){seasons=seasons.filter(x=>x.id!==id);LS.set("seasons",seasons);demoRender();} else { await deleteDoc(doc(db,"seasons",id)); } }
@@ -946,7 +997,7 @@ function setLiveMode(mode,pulse){
   else{
     // compter les inscrits de l'événement public visible (pas le total brut tous événements)
     const eid = (typeof evPubId==="function") ? evPubId() : null;
-    const n = eid ? regs.filter(r=>(r.eventId||null)===eid).length : 0;
+    const n = eid ? pubRegCount(eid) : 0;
     t.textContent="En direct"+(n?(" · "+n+" inscrit"+(n>1?"s":"")):"");
   }
   if(pulse&&mode==="on"){d.classList.remove("pulse");void d.offsetWidth;d.classList.add("pulse");}
@@ -1011,7 +1062,7 @@ function renderHome(){
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:14px">`+
         pubEvs.map(ev=>{
           const sel=ev.id===pubEventId;
-          const n=regs.filter(r=>(r.eventId||null)===ev.id).length;
+          const n=pubRegCount(ev.id);
           const dleft = ev.date ? Math.ceil((new Date(ev.date+"T23:59:59")-Date.now())/86400000) : null;
           const badge = dleft===null?"" : (dleft<=0?'<span class="pill" style="color:var(--danger);border-color:var(--danger)">🔴 En cours</span>':`<span class="pill" style="color:var(--cyan);border-color:var(--cyan)">J-${dleft}</span>`);
           const openBadge = ev.open===false?'<span class="pill" style="color:var(--muted)">🔒 Fermé</span>':'<span class="pill" style="color:var(--ok);border-color:var(--ok)">🎮 Ouvert</span>';
@@ -1037,10 +1088,10 @@ function renderHome(){
   const cd=$("#evCountdown");
   if(c.date){const ev=new Date(c.date+"T"+(c.time||"00:00")),diff=ev-new Date();
     cd.textContent=diff>0?"⚡ J-"+Math.ceil(diff/86400000)+" avant le combat":(diff>-86400000?"🔴 ÇA SE PASSE AUJOURD'HUI":"Événement terminé");}else cd.textContent="";
-  const pubRegs=regs.filter(r=>(r.eventId||null)===evPubId());
-  $("#evGames").innerHTML=(c.games||[]).map(g=>{const n=pubRegs.filter(r=>r.games.includes(g)).length;
+  const pid=evPubId();
+  $("#evGames").innerHTML=(c.games||[]).map(g=>{const n=pubGameCount(pid,g);
     return `<div class="game-chip"><span class="dot"></span>${esc(g)}${n?`<span class="n">${n} inscrit${n>1?"s":""}</span>`:""}</div>`;}).join("")||'<span class="sub">Aucun jeu configuré.</span>';
-  const players=pubRegs.length,entries=pubRegs.reduce((a,r)=>a+r.games.length,0);
+  const players=pubRegCount(pid),entries=pubPartCount(pid);
   $("#homeStats").innerHTML=`
     <div class="stat"><div class="v">${players}</div><div class="l">Joueurs inscrits</div></div>
     <div class="stat"><div class="v">${(c.games||[]).length}</div><div class="l">Jeux</div></div>
@@ -1143,6 +1194,7 @@ async function handleRegister(e){
   try{
     if(!DEMO) await createClaims(targetEvent,emailRaw,pseudo,code); // réserver e-mail + pseudo d'abord
     await saveReg(reg);
+    bumpCounters(targetEvent,games,+1); // compteur public (sans donnée personnelle)
     localStorage.setItem("fgc_myCode",code);
     f.reset(); toast("Inscription validée ! 🎮");
     const emailed=await sendConfirmEmail(reg);
@@ -1166,11 +1218,13 @@ async function sendConfirmEmail(reg){
   const evRegCount = regs.filter(r=>r.eventId===reg.eventId).length;
   try{
     if(!window._ejsReady){ await loadScript("https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"); window.emailjs.init({publicKey:ec.publicKey}); window._ejsReady=true; }
+    // logo : URL publique https uniquement (une image de mail doit être hébergée en ligne)
+    const logoUrl = /^https?:\/\//i.test(ec2.logo||"") ? ec2.logo : (/^https?:\/\//i.test(config.logo||"") ? config.logo : "");
     await window.emailjs.send(ec.serviceId, ec.templateId, {
       to_email:reg.email, pseudo:reg.pseudo||"", prenom:reg.prenom, nom:reg.nom,
       games:reg.games.join(", "), code:reg.code, event_name:ec2.name,
       event_date:fmtDate(ec2.date), event_place:ec2.addr,
-      price:priceStr, payment_link:payLink
+      price:priceStr, payment_link:payLink, logo_url:logoUrl
     });
     // copie à l'organisateur (optionnel)
     if(ec.orgTemplateId && !ec.orgTemplateId.startsWith("COLLE") && ec.orgEmail){
@@ -1197,7 +1251,7 @@ async function lookupMe(silent){
 function showMyCard(me,fresh,emailed){
   const gnames=me.games.map(g=>`<span class="badge">${esc(g)}</span>`).join(" ");
   const emailNote = fresh ? (emailed
-      ? '<div class="notice" style="border-left-color:var(--ok)">✉️ Un e-mail de confirmation t\'a été envoyé.</div>'
+      ? '<div class="notice" style="border-left-color:var(--ok)">✉️ Un e-mail de confirmation t\'a été envoyé — <b>pense à vérifier tes spams / courriers indésirables</b>.</div>'
       : (window.EMAILJS_CONFIG&&!String(window.EMAILJS_CONFIG.publicKey).startsWith("COLLE")?'<div class="notice warn">✉️ L\'e-mail n\'a pas pu partir, mais ton inscription est bien enregistrée.</div>':'')) : '';
   // bloc paiement
   let payBlock = '';
@@ -3108,6 +3162,7 @@ async function addPlayerManual(){
   // par défaut un ajout admin = présent sur place, donc paid:true. À décocher si à régler.
   await saveReg({id:code,code,eventId:currentEventId,pseudo:pseudo.trim(),prenom:prenom.trim(),nom:nom.trim(),age:age.trim(),ville:ville.trim(),email:email.trim(),telephone:telephone.trim(),games:gl,ts:Date.now(),amount,paid:true});
   if(!DEMO){ try{ await createClaims(currentEventId,email.trim(),pseudo.trim(),code); }catch(e){ console.error(e); } }
+  bumpCounters(currentEventId,gl,+1);
   toast("Joueur ajouté (code "+code+").");
 }
 
@@ -3174,8 +3229,11 @@ async function importBackup(file){
       for(const k of Object.keys(data.brackets||{})){ try{ await setDoc(doc(db,"brackets",k),data.brackets[k]); done++; }catch(e){ errs++; console.error("bracket",k,e); } }
       for(const s of data.seasons){ try{ const {id,...rest}=s; await setDoc(doc(db,"seasons",id),rest); done++; }catch(e){ errs++; console.error("season",s.id,e); } }
       try{ globalSponsors=data.globalSponsors||[]; await saveGlobalSponsors(); done++; }catch(e){ errs++; console.error("sponsors",e); }
+      // reposer les réservations anti-doublon pour les inscriptions restaurées
+      let claimsOk=0;
+      for(const r of data.registrations){ try{ await createClaims(r.eventId, r.email, r.pseudo, r.code||r.id); claimsOk++; }catch(e){ console.error("claim",r.id,e); } }
       if(errs) toast("Restauration : "+done+" élément(s) écrits, "+errs+" erreur(s) — voir console (F12).",true);
-      else toast("Restauration terminée ✓ ("+done+" éléments).");
+      else toast("Restauration terminée ✓ ("+done+" éléments, "+claimsOk+" réservations).");
     }
   }catch(e){ console.error(e); toast("Erreur pendant la restauration.",true); }
 }
