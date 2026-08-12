@@ -1030,12 +1030,15 @@ function renderHeader(){
     document.title="Cyber Bracket Editor";
     return;
   }
-  $("#brand").innerHTML=esc(config.title||"").replace(/\sVS\s/i,' <span class="vs">VS</span> ');
-  $("#tagline").textContent=config.subtitle||"";
+  // l'en-tête (logo, titre, sous-titre) suit l'ÉVÉNEMENT SÉLECTIONNÉ par le visiteur,
+  // comme la carte d'infos et les partenaires ; repli sur la config globale au chargement
+  const c=(events&&events.length)?pubConfig():config;
+  $("#brand").innerHTML=esc(c.title||"").replace(/\sVS\s/i,' <span class="vs">VS</span> ');
+  $("#tagline").textContent=c.subtitle||"";
   const img=$("#logoImg");
-  if(config.logo && /^https?:\/\//i.test(config.logo)){ img.src=config.logo; img.classList.remove("hidden"); img.onerror=()=>img.classList.add("hidden"); }
+  if(c.logo && /^https?:\/\//i.test(c.logo)){ img.src=c.logo; img.classList.remove("hidden"); img.onerror=()=>img.classList.add("hidden"); }
   else img.classList.add("hidden");
-  document.title=(config.name||"Tournoi")+" — Inscriptions";
+  document.title=(c.name||"Tournoi")+" — Inscriptions";
 }
 function fmtDate(d){if(!d)return"—";try{return new Date(d+"T00:00:00").toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});}catch(e){return d;}}
 function renderHome(){
@@ -1108,7 +1111,7 @@ function renderHome(){
 function selectPubEvent(id){
   if(!events.find(e=>e.id===id)) return;
   pubEventId=id;
-  renderHome(); renderGamePick(); renderPubBracketTabs();
+  renderHeader(); renderHome(); renderGamePick(); renderPubBracketTabs();
   if(!$("#view-brackets").classList.contains("hidden")) renderPubBracket();
 }
 function renderGamePick(){
