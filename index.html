@@ -282,7 +282,7 @@
         </div>
       </div>
     </div>
-    <div class="panel">
+    <div class="panel" id="howPanel">
       <h2>Comment ça marche</h2>
       <div class="stat-row" id="homeStats"></div>
       <p class="sub" style="margin:0">Inscris-toi en 1 minute, reçois ton <b style="color:var(--jaune)">code personnel</b> pour retrouver ta fiche à tout moment. Les organisateurs gèrent les arbres (simple/double élim., format FT), le <b style="color:var(--jaune)">classement final</b> s'affiche automatiquement et tout est synchronisé en temps réel.</p>
@@ -1032,7 +1032,8 @@ function setLiveMode(mode,pulse){
   else{
     // compter les inscrits de l'événement public visible (pas le total brut tous événements)
     const eid = (typeof evPubId==="function") ? evPubId() : null;
-    const n = eid ? pubRegCount(eid) : 0;
+    const visible = eid && publicEvents().some(e=>e.id===eid);
+    const n = visible ? pubRegCount(eid) : 0;
     t.textContent="En direct"+(n?(" · "+n+" inscrit"+(n>1?"s":"")):"");
   }
   if(pulse&&mode==="on"){d.classList.remove("pulse");void d.offsetWidth;d.classList.add("pulse");}
@@ -1089,9 +1090,17 @@ function renderHome(){
       <p class="sub" style="max-width:420px;margin:0 auto">Revenez bientôt — de nouveaux tournois seront annoncés ici. Suivez-nous pour ne rien manquer ! 🎮</p>
     </div>`;
     if(detail) detail.style.display="none";
+    // cohérence : sans événement visible, on masque aussi les stats « Comment ça marche »
+    const how=$("#howPanel"); if(how) how.style.display="none";
+    // les partenaires GLOBAUX restent affichés (branding permanent, sans lien à un événement)
+    const sb0=$("#sponsorsBanner");
+    if(sb0){ const urls=sponsorsFor(null);
+      sb0.innerHTML = urls.length ? `<div class="panel" style="padding:24px"><div class="sub" style="font-size:11px;letter-spacing:2px;text-transform:uppercase;text-align:center;margin-bottom:16px">— Nos partenaires —</div>${sponsorsBannerHTML(urls,{height:110})}</div>` : "";
+    }
     return;
   }
   if(detail) detail.style.display="";
+  { const how=$("#howPanel"); if(how) how.style.display=""; }
   // si l'événement public sélectionné n'est plus visible, on prend le 1er
   if(grid){
     if(!pubEventId || !pubEvs.find(e=>e.id===pubEventId)){ pubEventId = pubEvs[0] ? pubEvs[0].id : (events[0]&&events[0].id); }
