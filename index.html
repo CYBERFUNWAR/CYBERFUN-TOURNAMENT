@@ -483,6 +483,15 @@
             <button class="btn ghost sm" onclick="renderAdminLigue()">🔄 Actualiser</button>
           </div>
           <div id="adminLigueContent"></div>
+          <div class="notice" style="margin-top:16px">
+            🔗 <b>Fusionner deux pseudos</b> — si une même personne apparaît sous deux pseudos dans la Ligue (inscriptions avec des graphies différentes), fusionne-les : toutes ses lignes de classement passées sont renommées et ses points se cumulent.
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
+              <input id="mergeFrom" placeholder="Pseudo à absorber (disparaît)" style="max-width:230px">
+              <span>→</span>
+              <input id="mergeTo" placeholder="Pseudo conservé" style="max-width:230px">
+              <button class="btn sm" onclick="mergePseudos()">Fusionner</button>
+            </div>
+          </div>
         </div>
 
         <div id="atab-set" class="hidden">
@@ -982,6 +991,32 @@ async function bumpCounters(eventId,games,delta){
 async function saveBracket(game,data){ const key=bkKey(currentEventId,game); if(DEMO){brackets[key]=data;LS.set("brackets",brackets);demoRender();} else { await setDoc(doc(db,"brackets",key),data); } }
 async function saveSeason(season){ if(DEMO){const i=seasons.findIndex(x=>x.id===season.id);i>=0?seasons[i]=season:seasons.push(season);LS.set("seasons",seasons);demoRender();} else { await setDoc(doc(db,"seasons",season.id),season); } }
 async function removeSeason(id){ if(DEMO){seasons=seasons.filter(x=>x.id!==id);LS.set("seasons",seasons);demoRender();} else { await deleteDoc(doc(db,"seasons",id)); } }
+
+/* Fusionne deux pseudos dans TOUT l'historique de Ligue : chaque ligne de classement
+   portant l'ancien pseudo est renommée vers le pseudo conservé (insensible à la casse).
+   La Ligue agrégeant par pseudo, les points se cumulent automatiquement. */
+async function mergePseudos(){
+  if(!requireAdmin())return;
+  const from=($("#mergeFrom")?.value||"").trim(), to=($("#mergeTo")?.value||"").trim();
+  if(!from||!to) return toast("Renseigne les deux pseudos (à absorber → conservé).",true);
+  if(from.toLowerCase()===to.toLowerCase()) return toast("Les deux pseudos sont identiques.",true);
+  const hits=seasons.reduce((n,se)=>n+((se.entries||[]).filter(e=>(e.name||"").trim().toLowerCase()===from.toLowerCase()).length),0);
+  if(!hits) return toast(`Aucune ligne « ${from} » dans l'historique de Ligue.`,true);
+  if(!confirm(`Fusionner « ${from} » dans « ${to} » ?\n${hits} ligne(s) de classement seront renommées — les points se cumuleront sous « ${to} ».\n(Astuce : pense aussi à corriger le pseudo de son inscription en cours via ✏️ si un tournoi est ouvert.)`))return;
+  let nSeasons=0;
+  for(const se of seasons){
+    let touched=false;
+    const entries=(se.entries||[]).map(e=>{
+      if((e.name||"").trim().toLowerCase()===from.toLowerCase()){ touched=true; return {...e,name:to}; }
+      return e;
+    });
+    if(touched){ nSeasons++; await saveSeason({...se,entries}); }
+  }
+  const f=$("#mergeFrom"), t=$("#mergeTo"); if(f)f.value=""; if(t)t.value="";
+  toast(`Fusion terminée : ${hits} ligne(s) dans ${nSeasons} saison(s) → « ${to} ».`);
+  renderAdminLigue(); renderPubLigueTabs(); if(!$("#view-ligue").classList.contains("hidden")){renderPubLigue();renderPalmares();}
+}
+window.mergePseudos=mergePseudos;
 async function removeBracket(game){ const key=bkKey(currentEventId,game); if(DEMO){delete brackets[key];LS.set("brackets",brackets);demoRender();} else { await deleteDoc(doc(db,"brackets",key)); } }
 /* accesseur : bracket d'un jeu pour l'événement admin courant (ou un eid donné) */
 function getBk(game,eid){ return brackets[bkKey(eid||renderEid||currentEventId,game)]||null; }
@@ -1410,7 +1445,7 @@ function buildBracket(game,type,ft,ftFinal,seedMode){
   const size=type==="double"?Math.max(nextPow2(players.length),4):nextPow2(players.length);
   const order=seedOrder(size),slots=new Array(size).fill(null);
   order.forEach((seed,i)=>{ if(seed<=players.length) slots[i]=players[seed-1]; });
-  return {type,size,ft:ft||2,ftFinal:ftFinal||0,slots,scores:{},seedMode:seedMode||"random"};
+  return {type,size,ft:ft||2,ftFinal:ftFinal||0,slots,scores:{},seedMode:seedMode||"random",lbCross:true};
 }
 /* ordonne les joueurs par leur classement Ligue (meilleurs d'abord), les non-classés ensuite (mélangés) */
 /* Note de seed mixte par joueur, à partir de l'historique Ligue du jeu :
@@ -1677,7 +1712,16 @@ function resolve(bk){
   let l0=[];for(let m=0;m<los0.length/2;m++)l0.push(rmatch(bk,`lb-0-${m}`,los0[2*m],los0[2*m+1],los0S[2*m],los0S[2*m+1]));lb.push(l0);
   const totalLB=2*(k-1);
   for(let idx=1;idx<totalLB;idx++){const prevW=lb[idx-1].map(mm=>mm.winner),prevS=lb[idx-1].map(mm=>mm.settled),round=[];
-    if(idx%2===1){const wbN=(idx+3)/2,drops=wb[wbN-1].map(mm=>mm.loser),dropsS=wb[wbN-1].map(mm=>mm.settled);for(let m=0;m<prevW.length;m++)round.push(rmatch(bk,`lb-${idx}-${m}`,prevW[m],drops[m],prevS[m],dropsS[m]));}
+    if(idx%2===1){const wbN=(idx+3)/2;let drops=wb[wbN-1].map(mm=>mm.loser),dropsS=wb[wbN-1].map(mm=>mm.settled);
+      // Croisement anti-rematch (brackets générés avec lbCross) : les perdants du WB sont
+      // insérés en ordre croisé pour ne pas retomber sur des joueurs déjà affrontés.
+      // Alternance classique des TO : inversion complète, puis échange de moitiés.
+      if(bk.lbCross && drops.length>1){
+        const dr=(idx-1)/2;
+        if(dr%2===0){ drops=drops.slice().reverse(); dropsS=dropsS.slice().reverse(); }
+        else { const h=drops.length/2; drops=[...drops.slice(h),...drops.slice(0,h)]; dropsS=[...dropsS.slice(h),...dropsS.slice(0,h)]; }
+      }
+      for(let m=0;m<prevW.length;m++)round.push(rmatch(bk,`lb-${idx}-${m}`,prevW[m],drops[m],prevS[m],dropsS[m]));}
     else{for(let m=0;m<prevW.length/2;m++)round.push(rmatch(bk,`lb-${idx}-${m}`,prevW[2*m],prevW[2*m+1],prevS[2*m],prevS[2*m+1]));}
     lb.push(round);}
   const lbChamp=lb[lb.length-1][0].winner;const lbS=lb[lb.length-1][0].settled;const wbS=wb[k-1][0].settled;
@@ -2322,7 +2366,7 @@ async function confirmSeed(){
   const size=genFormat==="double"?Math.max(nextPow2(d.list.length),4):nextPow2(d.list.length);
   const order=seedOrder(size),slots=new Array(size).fill(null);
   order.forEach((seed,i)=>{ if(seed<=d.list.length) slots[i]=d.list[seed-1]; });
-  const data={type:genFormat,size,ft:d.ft||2,ftFinal:d.ftFinal||0,slots,scores:{},seedMode:"ligue"};
+  const data={type:genFormat,size,ft:d.ft||2,ftFinal:d.ftFinal||0,slots,scores:{},seedMode:"ligue",lbCross:true};
   await saveBracket(d.game,data);
   _seedDraft=null;
   toast("Bracket généré avec têtes de série.");
