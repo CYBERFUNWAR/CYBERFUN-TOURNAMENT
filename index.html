@@ -184,13 +184,15 @@
   .round-title{font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--violet-2);text-align:center;margin-bottom:14px;padding-bottom:8px;border-bottom:1px dashed var(--line)}
   /* match : la hauteur réelle est mesurée par le moteur de layout pour l'alignement */
   .match{position:relative;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;overflow:visible}
-  .station-tag{position:absolute;bottom:-9px;right:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:0 6px;font-size:10px;color:var(--cyan);z-index:3;line-height:16px}
-  .station-edit{position:absolute;bottom:-10px;right:8px;z-index:3;display:flex;align-items:center;gap:3px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:0 4px;font-size:10px;color:var(--muted);line-height:18px}
+  /* pied de carte « poste / en cours » : DANS le flux (le moteur de layout mesure
+     la hauteur réelle de la carte, donc jamais de chevauchement avec les boutons) */
+  .station-tag{display:flex;justify-content:flex-end;align-items:center;gap:5px;background:rgba(10,6,18,.35);border-top:1px solid var(--line);border-radius:0 0 10px 10px;padding:3px 8px;font-size:11px;color:var(--cyan);line-height:20px}
+  .station-edit{display:flex;justify-content:flex-end;align-items:center;gap:6px;background:rgba(10,6,18,.35);border-top:1px solid var(--line);border-radius:0 0 10px 10px;padding:4px 8px;font-size:11px;color:var(--muted);line-height:20px}
   .live-btn{border:1px solid var(--line);background:rgba(10,6,18,.5);color:var(--muted);border-radius:7px;font-size:13px;line-height:24px;padding:0 9px;cursor:pointer;touch-action:manipulation}
   .live-btn.on{background:rgba(255,77,109,.2);border-color:#ff4d6d;color:#ff4d6d;box-shadow:0 0 8px rgba(255,77,109,.5)}
   .match.live{border-color:#ff4d6d!important;box-shadow:0 0 14px rgba(255,77,109,.35)}
   .live-tag{position:absolute;top:-10px;left:8px;z-index:3;background:#2a0a14;border:1px solid #ff4d6d;color:#ff4d6d;border-radius:6px;font-size:9px;letter-spacing:1px;padding:1px 6px;font-weight:700}
-  .station-edit input{width:36px;font-size:10px;padding:0 2px;border:none;background:transparent;color:var(--cyan);text-align:center;outline:none}
+  .station-edit input{width:44px;font-size:12px;border:none;background:transparent;color:var(--cyan);text-align:center;outline:none;padding:0}
   /* variante inline du poste, pour les cartes de groupes/poules Capcom */
   .station-inline{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:6px;padding:0 5px;font-size:10px;color:var(--cyan);line-height:16px;background:rgba(10,6,18,.5);text-transform:none;letter-spacing:0}
   .station-inline input{width:38px;font-size:10px;padding:0;border:none;background:transparent;color:var(--cyan);text-align:center;outline:none}
@@ -222,11 +224,15 @@
   .slot.swap-selected{background:rgba(255,226,61,.22)!important;color:var(--jaune)}
   .score{font-family:'Orbitron',sans-serif;font-size:14px;min-width:20px;text-align:center;color:var(--muted)}
   .slot.win .score{color:var(--jaune)}
-  .sc-btns{display:flex;flex-direction:row;gap:5px;margin-left:8px;flex-shrink:0}
-  .sc-btns button{width:34px;height:34px;line-height:1;font-size:15px;border:1px solid var(--violet);background:rgba(168,85,247,.12);color:var(--violet-2);cursor:pointer;border-radius:9px;padding:0;touch-action:manipulation;transition:.12s}
+  .sc-btns{display:flex;flex-direction:row;gap:5px;margin-left:8px;flex-shrink:0;align-items:center}
+  .sc-btns button{width:31px;height:31px;line-height:1;font-size:14px;border:1px solid var(--violet);background:rgba(168,85,247,.12);color:var(--violet-2);cursor:pointer;border-radius:9px;padding:0;touch-action:manipulation;transition:.12s}
   .sc-btns button:hover{border-color:var(--jaune);color:var(--jaune);background:rgba(255,226,61,.12)}
   .sc-btns button:active{transform:scale(.9)}
-  @media (max-width:640px){ .sc-btns button{width:38px;height:38px;font-size:16px} }
+  /* forfait/DQ : écarté des flèches (séparateur) + style « danger » pour éviter le clic accidentel */
+  .sc-btns button.ff{margin-left:10px;border-color:rgba(255,77,109,.45);background:rgba(255,77,109,.08);position:relative}
+  .sc-btns button.ff::before{content:"";position:absolute;left:-8px;top:5px;bottom:5px;border-left:1px solid var(--line)}
+  .sc-btns button.ff:hover{border-color:var(--danger);color:var(--danger);background:rgba(255,77,109,.16)}
+  @media (max-width:640px){ .sc-btns button{width:36px;height:36px;font-size:16px} }
   .champion{margin-top:22px;text-align:center;font-family:'Orbitron',sans-serif}
   .champion .lab{font-size:11px;letter-spacing:3px;color:var(--muted);text-transform:uppercase}
   .champion .who{font-size:26px;color:var(--jaune);text-shadow:var(--glow-y);margin-top:6px}
@@ -2283,7 +2289,7 @@ function capcomPhase2HTML(game, editable){
       const p2Win=m.winner&&m.p2&&m.winner.id===m.p2.id;
       const active=editable&&m.p1&&m.p2;
       const stH=capcomStationHTML(game,`p2-g${gi}-${m.key}`,m,editable);
-      const arrows=(which)=>active?`<span class="sc-btns"><button onclick="bump('${game}','p2-g${gi}-${m.key}','${which}',1)">▲</button><button onclick="bump('${game}','p2-g${gi}-${m.key}','${which}',-1)">▼</button><button onclick="forfait('${game}','p2-g${gi}-${m.key}','${which}')" title="Déclarer forfait / DQ" style="color:var(--danger)">⚑</button></span>`:'';
+      const arrows=(which)=>active?`<span class="sc-btns"><button onclick="bump('${game}','p2-g${gi}-${m.key}','${which}',1)">▲</button><button onclick="bump('${game}','p2-g${gi}-${m.key}','${which}',-1)">▼</button><button class="ff" onclick="forfait('${game}','p2-g${gi}-${m.key}','${which}')" title="Déclarer forfait / DQ" style="color:var(--danger)">⚑</button></span>`:'';
       const ffP2=ffSide(game,`p2-g${gi}-${m.key}`);
       html+=`<div style="margin-top:6px;background:rgba(10,6,18,.45);border-radius:8px;padding:4px 8px">
         ${stH?`<div style="display:flex;justify-content:flex-end;margin-bottom:2px">${stH}</div>`:""}
@@ -2366,7 +2372,7 @@ function capcomP3Slot(game,m,which,editable){
   const active=editable&&p&&other;
   const isFF=ffSide(game,"p3-"+m.key)===which;
   const scoreCell=(p&&other)?`<span class="score"${isFF?' style="color:var(--danger)"':''}>${isFF?"F":sc}</span>`:"";
-  const btns=active?`<span class="sc-btns"><button onclick="bump('${game}','p3-${m.key}','${which}',1)">▲</button><button onclick="bump('${game}','p3-${m.key}','${which}',-1)">▼</button><button onclick="forfait('${game}','p3-${m.key}','${which}')" title="Déclarer forfait / DQ" style="color:var(--danger)">⚑</button></span>`:"";
+  const btns=active?`<span class="sc-btns"><button onclick="bump('${game}','p3-${m.key}','${which}',1)">▲</button><button onclick="bump('${game}','p3-${m.key}','${which}',-1)">▼</button><button class="ff" onclick="forfait('${game}','p3-${m.key}','${which}')" title="Déclarer forfait / DQ" style="color:var(--danger)">⚑</button></span>`:"";
   return `<div class="${cls}"><span class="nm">${p?esc(p.name):"À déterminer"}</span>${scoreCell}${btns}</div>`;
 }
 
@@ -2575,7 +2581,7 @@ function capcomPhase1HTML(game, editable){
       const p2Win = m.winner && m.p2 && m.winner.id===m.p2.id;
       const active = editable && m.p1 && m.p2;
       const arrowsBtn = (which) => active
-        ? `<span class="sc-btns"><button onclick="bump('${game}','p1-g${gi}-${m.key}','${which}',1)">▲</button><button onclick="bump('${game}','p1-g${gi}-${m.key}','${which}',-1)">▼</button><button onclick="forfait('${game}','p1-g${gi}-${m.key}','${which}')" title="Déclarer forfait / DQ" style="color:var(--danger)">⚑</button></span>`
+        ? `<span class="sc-btns"><button onclick="bump('${game}','p1-g${gi}-${m.key}','${which}',1)">▲</button><button onclick="bump('${game}','p1-g${gi}-${m.key}','${which}',-1)">▼</button><button class="ff" onclick="forfait('${game}','p1-g${gi}-${m.key}','${which}')" title="Déclarer forfait / DQ" style="color:var(--danger)">⚑</button></span>`
         : '';
       const ffP1=ffSide(game,`p1-g${gi}-${m.key}`);
       html += `<div style="margin-top:6px;background:rgba(10,6,18,.45);border-radius:8px;padding:4px 8px">
@@ -2655,7 +2661,7 @@ function slotHTML(game,m,which,editable){
   }
   const isFF=ffSide(game,m.key)===which;
   const scoreCellFF=(p&&other)?`<span class="score"${isFF?' style="color:var(--danger)"':''}>${isFF?"F":sc}</span>`:"";
-  const btns=active?`<span class="sc-btns"><button onclick="bump('${game}','${m.key}','${which}',1)">▲</button><button onclick="bump('${game}','${m.key}','${which}',-1)">▼</button><button onclick="forfait('${game}','${m.key}','${which}')" title="Déclarer forfait / DQ" style="color:var(--danger)">⚑</button></span>`:"";
+  const btns=active?`<span class="sc-btns"><button onclick="bump('${game}','${m.key}','${which}',1)">▲</button><button onclick="bump('${game}','${m.key}','${which}',-1)">▼</button><button class="ff" onclick="forfait('${game}','${m.key}','${which}')" title="Déclarer forfait / DQ" style="color:var(--danger)">⚑</button></span>`:"";
   return `<div class="${cls}"><span class="nm">${p?esc(p.name):"À déterminer"}</span>${scoreCellFF}${btns}</div>`;
 }
 function bracketHasScores(bk){ if(!bk||!bk.scores) return false; for(const k in bk.scores){ const s=bk.scores[k]; if((s.a||0)>0||(s.b||0)>0) return true; } return false; }
@@ -4057,12 +4063,8 @@ function regieMatchListHTML(data, banner){
       return String(x.station).localeCompare(String(y.station),"fr",{numeric:true});
     };
     const liveList=data.ready.filter(m=>m.live).sort(byStation);
-    const withSt=data.ready.filter(m=>m.station).sort((x,y)=>{
-      const nx=parseInt(x.station,10), ny=parseInt(y.station,10);
-      if(!isNaN(nx)&&!isNaN(ny)) return nx-ny;
-      return String(x.station).localeCompare(String(y.station),"fr",{numeric:true});
-    });
-    const noSt=data.ready.filter(m=>!m.station);
+    const withSt=data.ready.filter(m=>!m.live && m.station).sort(byStation);
+    const noSt=data.ready.filter(m=>!m.live && !m.station);
     const CAP=8; // par colonne
     const card=(m,compact,waiting)=>{
       const ns=compact?"clamp(15px,1.7vw,24px)":"clamp(20px,2.6vw,36px)";
@@ -4088,26 +4090,17 @@ function regieMatchListHTML(data, banner){
       return c+'</div></div>';
     };
     html+='<div><div style="font-size:clamp(18px,2.4vw,32px);color:#4dffa1;margin-bottom:16px;font-weight:700">▶ À JOUER MAINTENANT</div>';
-    if(liveList.length){
-      // mode « annonce » : les matchs lancés à gauche en rouge, le reste en attente
-      const waitList=data.ready.filter(m=>!m.live).sort(byStation);
-      if(waitList.length){
-        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">'
-             + colHTML("🔴 EN COURS","#ff4d6d",liveList,"live")
-             + colHTML("⏳ EN ATTENTE","#ffe23d",waitList,true)
-             + '</div>';
-      } else {
-        html+=colHTML("🔴 EN COURS","#ff4d6d",liveList,"live");
-      }
-    } else if(withSt.length && noSt.length){
-      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">'
-           + colHTML("🖥 SUR LES POSTES","#4dffa1",withSt,false)
-           + colHTML("⏳ EN ATTENTE DE POSTE","#ffe23d",noSt,true)
+    // trois familles : 🔴 en cours (annoncés) · 🖥 prochains sur les postes · ⏳ en attente
+    const groups=[];
+    if(liveList.length) groups.push(["🔴 EN COURS","#ff4d6d",liveList,"live"]);
+    if(withSt.length)   groups.push([liveList.length?"🖥 PROCHAINS SUR LES POSTES":"🖥 SUR LES POSTES","#4dffa1",withSt,false]);
+    if(noSt.length)     groups.push(["⏳ EN ATTENTE","#ffe23d",noSt,true]);
+    if(groups.length>1){
+      html+='<div style="display:grid;grid-template-columns:repeat('+groups.length+',1fr);gap:20px;align-items:start">'
+           + groups.map(g=>colHTML(g[0],g[1],g[2],g[3])).join("")
            + '</div>';
-    } else if(withSt.length){
-      html+=colHTML("🖥 SUR LES POSTES","#4dffa1",withSt,false);
-    } else {
-      html+=colHTML("⏳ EN ATTENTE DE POSTE","#ffe23d",noSt,true);
+    } else if(groups.length===1){
+      html+=colHTML(groups[0][0],groups[0][1],groups[0][2],groups[0][3]);
     }
     html+='</div>';
   } else {
