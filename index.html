@@ -257,7 +257,7 @@
 
   <nav>
     <div class="tab active" data-view="accueil">⚡ Accueil</div>
-    <div class="tab" data-view="moi">🔎 Mon inscription</div>
+    <div class="tab" data-view="moi">👤 Mon profil</div>
     <div class="tab" data-view="brackets">🏆 Brackets</div>
     <div class="tab" data-view="ligue">🏅 Ligue</div>
     <div class="tab" data-view="admin">🔐 Admin</div>
@@ -285,7 +285,7 @@
     <div class="panel" id="howPanel">
       <h2>Comment ça marche</h2>
       <div class="stat-row" id="homeStats"></div>
-      <p class="sub" style="margin:0">Inscris-toi en 1 minute, reçois ton <b style="color:var(--jaune)">code personnel</b> pour retrouver ta fiche à tout moment. Les organisateurs gèrent les arbres (simple/double élim., format FT), le <b style="color:var(--jaune)">classement final</b> s'affiche automatiquement et tout est synchronisé en temps réel.</p>
+      <p class="sub" style="margin:0">Inscris-toi en 1 minute : ton <b style="color:var(--jaune)">compte joueur</b> se crée en même temps (pseudo ou e-mail + mot de passe). Retrouve ta fiche, ton <b style="color:var(--jaune)">avatar</b>, tes tournois et tes stats à tout moment sur « Mon profil ». Les organisateurs gèrent les arbres (simple/double élim., format FT), le <b style="color:var(--jaune)">classement final</b> s'affiche automatiquement et tout est synchronisé en temps réel.</p>
     </div>
     <div id="sponsorsBanner"></div>
   </section>
@@ -293,7 +293,7 @@
   <section id="view-inscription" class="hidden">
     <div class="panel corner">
       <h2>Formulaire d'inscription</h2>
-      <p class="sub">Tes informations ne sont visibles que par toi (via ton code) et par l'organisation.</p>
+      <p class="sub">Tes informations ne sont visibles que par toi (via ton compte) et par l'organisation.</p>
       <div id="regEventBanner"></div>
       <div id="regClosedMsg" class="hidden"></div>
       <form id="regForm" autocomplete="on">
@@ -989,10 +989,27 @@ function ageFromBirthdate(b){
 }
 function pseudoKey(p){ return (p||"").trim().toLowerCase(); }
 
+/* ---- avatars PUBLICS : collection avatars/{pseudoLower} = {uid, avatar} ----
+   Seule l'image y est copiée (jamais l'identité) : affichable sur la fiche
+   joueur publique et le podium de la Ligue. Synchronisée depuis le profil. */
+const _avCache={};
+async function avatarFor(pseudo){
+  const k=pseudoKey(pseudo); if(!k||DEMO) return null;
+  if(k in _avCache) return _avCache[k];
+  try{ const s=await getDoc(doc(db,"avatars",k)); _avCache[k]=s.exists()?(s.data().avatar||null):null; }
+  catch(e){ _avCache[k]=null; }
+  return _avCache[k];
+}
+async function publishAvatar(pseudo,uid,data){
+  const k=pseudoKey(pseudo); if(!k||DEMO) return;
+  try{ await setDoc(doc(db,"avatars",k),{uid,avatar:data||""}); _avCache[k]=data||null; }catch(e){ console.error("avatar public",e); }
+}
+
 async function loadPlayerProfile(){
   if(!playerUser){ playerProfile=null; myRegs=[]; return; }
   try{ const snap=await getDoc(doc(db,"players",playerUser.uid)); playerProfile=snap.exists()?{uid:playerUser.uid,...snap.data()}:null; }
   catch(e){ console.error("profil",e); playerProfile=null; }
+  if(playerProfile && playerProfile.avatar && playerProfile.pseudo) publishAvatar(playerProfile.pseudo,playerUser.uid,playerProfile.avatar); // publie l'avatar (idempotent)
   await loadMyRegs();
 }
 async function loadMyRegs(){
@@ -1056,6 +1073,7 @@ function myAvatarPick(input){
       }
       await setDoc(doc(db,"players",playerUser.uid),{...stripUid(playerProfile),avatar:data});
       playerProfile={...playerProfile,avatar:data};
+      publishAvatar(playerProfile.pseudo,playerUser.uid,data); // version publique (fiche joueur, podium)
       renderProfileView(); toast("Avatar mis à jour ✓");
     }catch(e){ console.error(e); toast("Impossible d'enregistrer l'avatar.",true); }
     URL.revokeObjectURL(img.src);
@@ -1085,6 +1103,9 @@ async function saveMyProfile(){
     const prof={...stripUid(playerProfile),pseudo,prenom,nom,ville,telephone:tel,birthdate:birth};
     await setDoc(doc(db,"players",playerUser.uid),prof);
     playerProfile={uid:playerUser.uid,...prof};
+    // avatar public : suit le pseudo
+    if(prof.avatar) publishAvatar(pseudo,playerUser.uid,prof.avatar);
+    if(changed && pseudoKey(oldPseudo)){ try{ await deleteDoc(doc(db,"avatars",pseudoKey(oldPseudo))); delete _avCache[pseudoKey(oldPseudo)]; }catch(e){} }
     // synchroniser les inscriptions des événements encore ouverts (pas l'historique)
     for(const r of myRegs){
       const ev=events.find(e=>e.id===r.eventId);
@@ -3943,7 +3964,7 @@ function renderPubLigue(){
     html+='<div class="podium">';
     [1,0,2].forEach(idx=>{ const p=top3[idx]; if(!p) return;
       const cl=idx===0?"g1":(idx===1?"g2":"g3");
-      html+=`<div class="pod ${cl}"><div class="medal">${medals[idx]}</div><div class="pname" data-player="${esc(p.name)}" onclick="showPlayerCard(this.dataset.player)" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">${esc(p.name)}</div><div class="plab">${p.points} pts · ${p.count} tournoi${p.count>1?"s":""}</div></div>`;
+      html+=`<div class="pod ${cl}"><div class="pod-av" data-av="${esc(p.name)}" style="display:none;margin:0 auto 6px;width:56px;height:56px"><img alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,226,61,.55)"></div><div class="medal">${medals[idx]}</div><div class="pname" data-player="${esc(p.name)}" onclick="showPlayerCard(this.dataset.player)" style="cursor:pointer;text-decoration:underline;text-decoration-style:dotted">${esc(p.name)}</div><div class="plab">${p.points} pts · ${p.count} tournoi${p.count>1?"s":""}</div></div>`;
     });
     html+='</div>';
   }
@@ -3954,6 +3975,8 @@ function renderPubLigue(){
   // palmarès des champions de saison (toutes années, pour ce jeu)
   html+=seasonChampionsHTML(pubLigueGame);
   cont.innerHTML=html;
+  // avatars du podium (chargés après coup, sans bloquer l'affichage)
+  cont.querySelectorAll(".pod-av").forEach(el=>{ avatarFor(el.dataset.av).then(a=>{ if(a){ const i=el.querySelector("img"); if(i){ i.src=a; el.style.display=""; } } }); });
 }
 /* champion de chaque saison (année civile) pour un jeu : le 1er du classement de l'année */
 function seasonChampions(game){
@@ -4359,7 +4382,8 @@ function playerProgressSVG(timeline){
 function showPlayerCard(name){
   const st=playerStats(name);
   const medals={1:"🥇",2:"🥈",3:"🥉"};
-  let body=`<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px">
+  let body=`<div id="pcAvatarBox" style="display:none;float:right;margin:0 0 10px 14px"><img id="pcAvatar" alt="" style="width:76px;height:76px;border-radius:50%;object-fit:cover;border:2px solid var(--violet);box-shadow:var(--glow-v)"></div>`;
+  body+=`<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:16px">
     <div class="stat" style="min-width:84px"><div class="v" style="color:var(--jaune)">${st.totalPoints}</div><div class="l">Points saison</div></div>
     <div class="stat" style="min-width:84px"><div class="v">${st.count}</div><div class="l">Tournois</div></div>
     <div class="stat" style="min-width:84px"><div class="v" style="color:var(--cyan)">${st.podiums}</div><div class="l">Podiums</div></div>
@@ -4399,6 +4423,7 @@ function showPlayerCard(name){
     body+='<div class="notice">Aucune participation enregistrée pour ce joueur.</div>';
   }
   openModal("🎮 "+esc(st.name), body);
+  avatarFor(st.name).then(a=>{ const b=$("#pcAvatarBox"),i=$("#pcAvatar"); if(a&&b&&i){ i.src=a; b.style.display=""; } });
 }
 /* modale générique réutilisable */
 function openModal(title, bodyHTML){
