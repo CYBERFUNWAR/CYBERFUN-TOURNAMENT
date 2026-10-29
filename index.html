@@ -302,33 +302,35 @@
           <label>Ne pas remplir ce champ</label>
           <input name="website" tabindex="-1" autocomplete="off">
         </div>
-        <div class="field"><label>Pseudo / Gamertag *</label><input name="pseudo" required maxlength="40" placeholder="Ton pseudo de joueur (affiché dans les brackets)"></div>
+        <div id="regLoggedBanner"></div>
+        <div id="regIdentity">
+        <div class="field"><label>Pseudo / Gamertag *</label><input name="pseudo" maxlength="40" placeholder="Ton pseudo de joueur (affiché dans les brackets)"></div>
         <div class="grid2">
-          <div class="field"><label>Prénom *</label><input name="prenom" required maxlength="40" placeholder="Ryu"></div>
-          <div class="field"><label>Nom *</label><input name="nom" required maxlength="40" placeholder="Hoshi"></div>
+          <div class="field"><label>Prénom *</label><input name="prenom" maxlength="40" placeholder="Ryu"></div>
+          <div class="field"><label>Nom *</label><input name="nom" maxlength="40" placeholder="Hoshi"></div>
         </div>
         <div class="grid2">
-          <div class="field"><label>Âge *</label><input name="age" type="number" min="6" max="120" required placeholder="21"></div>
-          <div class="field"><label>Ville *</label><input name="ville" required maxlength="60" placeholder="Hyères"></div>
+          <div class="field"><label>Date de naissance *</label><input name="birthdate" type="date"></div>
+          <div class="field"><label>Ville *</label><input name="ville" maxlength="60" placeholder="Hyères"></div>
         </div>
         <div class="grid2">
-          <div class="field"><label>E-mail *</label><input name="email" type="email" required placeholder="ryu@mail.com"></div>
-          <div class="field"><label>Téléphone *</label><input name="telephone" required maxlength="25" placeholder="06 12 34 56 78"></div>
+          <div class="field"><label>E-mail *</label><input name="email" type="email" placeholder="ryu@mail.com"></div>
+          <div class="field"><label>Téléphone *</label><input name="telephone" maxlength="25" placeholder="06 12 34 56 78"></div>
+        </div>
+        <div id="regAccountFields">
+        <div class="notice" style="margin-top:6px;font-size:12px">🔐 <b>Ton compte joueur</b> — choisis un mot de passe : il crée ton compte en même temps que ton inscription. Tu pourras ensuite te reconnecter avec ton <b>pseudo ou ton e-mail</b> (page « Mon profil ») pour retrouver ta fiche, modifier tes infos et suivre tes stats.</div>
+        <div class="grid2">
+          <div class="field"><label>Mot de passe * <span class="sub" style="font-size:10px">(6 caractères min.)</span></label><input name="password" type="password" autocomplete="new-password" placeholder="••••••••"></div>
+          <div class="field"><label>Confirme le mot de passe *</label><input name="password2" type="password" autocomplete="new-password" placeholder="••••••••"></div>
+        </div>
+        </div>
         </div>
         <div class="field"><label>Choisis ton ou tes jeu(x) *</label><div class="game-pick" id="gamePick"></div></div>
         <div id="priceRecap"></div>
-        <div class="notice" style="margin-top:16px;font-size:12.5px;line-height:1.7">
-          📄 <b>Documents à télécharger</b>
-          <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">
-            <a href="docs/reglement-shoken-cup.pdf" target="_blank" rel="noopener" style="color:var(--cyan);text-decoration:underline;text-decoration-style:dotted">📘 Règlement de la compétition (à lire avant de t'inscrire)</a>
-            <a href="docs/autorisation-parentale.pdf" target="_blank" rel="noopener" style="color:var(--jaune);text-decoration:underline;text-decoration-style:dotted">📝 Autorisation parentale de participation (mineurs)</a>
-            <a href="docs/autorisation-droit-image-mineur.pdf" target="_blank" rel="noopener" style="color:var(--jaune);text-decoration:underline;text-decoration-style:dotted">📸 Autorisation d'exploitation du droit à l'image (mineurs)</a>
-          </div>
-          <div class="sub" style="font-size:11.5px;margin-top:8px"><b>Participants mineurs :</b> imprime et fais signer les deux autorisations par ton représentant légal, et présente-les à l'organisation le jour de l'événement (avec les pièces demandées).</div>
-        </div>
+        <div id="regDocs"></div>
         <div class="notice" style="margin-top:16px;font-size:12px;line-height:1.6">
-          🔒 <b>Tes données personnelles</b> — Les informations de ce formulaire sont collectées par l'organisation du tournoi, uniquement pour gérer les inscriptions, le déroulement des matchs et le classement de la ligue. Elles ne sont ni vendues ni transmises à des tiers. <b style="color:var(--jaune)">Ton pseudo et tes résultats seront affichés publiquement</b> (brackets, classements, palmarès) ; tes nom, e-mail et téléphone restent visibles de la seule organisation. Tu peux annuler ton inscription à tout moment via ton code personnel (page « Mon inscription ») ou demander la suppression de tes données en contactant l'organisation. <b>Les joueurs mineurs</b> doivent disposer d'une autorisation parentale.
-          <div style="margin-top:10px">📸 <b>Droit à l'image</b> — Le tournoi fait l'objet de captations vidéo, de streamings en direct, de replays et de photographies, susceptibles d'être diffusés par Cyberfun et l'ASBTP. Les conditions détaillées figurent dans le règlement de l'événement. <b>Pour les participants mineurs</b>, l'autorisation relative au droit à l'image doit être donnée par le représentant légal : une <b>autorisation parentale écrite</b> est requise (modèles téléchargeables ci-dessus) et devra être remise à l'organisation au plus tard le jour de l'événement.</div>
+          🔒 <b>Tes données personnelles</b> — Les informations de ce formulaire sont collectées par l'organisation du tournoi, uniquement pour gérer les inscriptions, le déroulement des matchs et le classement de la ligue. Elles ne sont ni vendues ni transmises à des tiers. <b style="color:var(--jaune)">Ton pseudo et tes résultats seront affichés publiquement</b> (brackets, classements, palmarès) ; tes nom, e-mail et téléphone restent visibles de la seule organisation. Tu peux consulter, modifier ou annuler ton inscription à tout moment depuis ton compte (page « Mon profil ») ou demander la suppression de tes données en contactant l'organisation. <b>Les joueurs mineurs</b> doivent disposer d'une autorisation parentale.
+          <div style="margin-top:10px">📸 <b>Droit à l'image</b> — Le tournoi fait l'objet de captations vidéo, de streamings en direct, de replays et de photographies, susceptibles d'être diffusés par Cyberfun et l'ASBTP. Les conditions détaillées figurent dans le règlement de l'événement. <b>Pour les participants mineurs</b>, l'autorisation relative au droit à l'image doit être donnée par le représentant légal : une <b>autorisation parentale écrite</b> est requise (voir les documents à télécharger de l'événement, le cas échéant) et devra être remise à l'organisation au plus tard le jour de l'événement.</div>
         </div>
         <label style="display:flex;align-items:flex-start;gap:10px;margin-top:12px;cursor:pointer;font-size:13px">
           <input type="checkbox" name="consent" required style="width:18px;height:18px;margin-top:1px;accent-color:var(--jaune);flex-shrink:0">
@@ -343,17 +345,7 @@
     </div>
   </section>
 
-  <section id="view-moi" class="hidden">
-    <div class="panel corner">
-      <h2>Mon inscription</h2>
-      <p class="sub">Entre le <b style="color:var(--jaune)">code personnel</b> reçu lors de ton inscription pour retrouver ta fiche. Tu ne vois que tes propres informations.</p>
-      <div class="grid2">
-        <div class="field"><label>Ton code</label><input id="lookupCode" placeholder="EX. K7M2QP9R" style="text-transform:uppercase;letter-spacing:2px" onkeydown="if(event.key==='Enter')lookupMe()"></div>
-        <div class="field" style="display:flex;align-items:flex-end"><button class="btn" style="width:100%" onclick="lookupMe()">Retrouver ma fiche</button></div>
-      </div>
-      <div id="lookupResult"></div>
-    </div>
-  </section>
+  <section id="view-moi" class="hidden"><div id="profileRoot"></div></section>
 
   <section id="view-brackets" class="hidden">
     <div class="panel corner">
@@ -522,6 +514,14 @@
           </div>
           <div class="notice" style="margin-top:0">Le prix total se calcule automatiquement selon le nombre de jeux choisis par chaque joueur. Mets <b>0</b> pour rendre l'événement <b>gratuit</b>. Si tu indiques un lien de paiement, il sera affiché au joueur et inclus dans l'e-mail de confirmation (variables <code>{{price}}</code> et <code>{{payment_link}}</code> à utiliser dans ton modèle EmailJS).</div>
 
+          <h2 style="font-size:16px;margin-top:24px">📄 Documents de l'événement</h2>
+          <p class="sub">Liens affichés dans le formulaire d'inscription (« Documents à télécharger »). Laisse vide pour masquer un document — le bloc disparaît si les trois sont vides. Mets l'adresse complète d'un fichier en ligne, ou un chemin relatif du site comme <code>docs/mon-reglement.pdf</code> (fichier à déposer dans le dossier <code>docs/</code> du dépôt GitHub).</p>
+          <div class="field"><label>📘 Règlement de la compétition (URL)</label><input id="setDocReglement" placeholder="docs/reglement-mon-tournoi.pdf"></div>
+          <div class="grid2">
+            <div class="field"><label>📝 Autorisation parentale (URL)</label><input id="setDocParentale" placeholder="docs/autorisation-parentale.pdf"></div>
+            <div class="field"><label>📸 Autorisation droit à l'image (URL)</label><input id="setDocImage" placeholder="docs/autorisation-droit-image-mineur.pdf"></div>
+          </div>
+
           <h2 style="font-size:16px;margin-top:24px">🤝 Sponsors</h2>
           <p class="sub">Logos affichés sur l'accueil et en mode régie. Colle les URL des images (hébergées sur ton site, Imgur…), <b>une par ligne</b>.</p>
           <div class="field"><label>Sponsors globaux (tous les événements)</label><textarea id="setSponsorsGlobal" rows="3" style="resize:vertical" placeholder="https://exemple.com/logo-sponsor1.png&#10;https://exemple.com/logo-sponsor2.png"></textarea></div>
@@ -654,21 +654,23 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, updateDoc, increment, collection, onSnapshot, query }
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, updateDoc, increment, collection, onSnapshot, query, where, getDocs }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, indexedDBLocalPersistence, browserLocalPersistence }
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut, onAuthStateChanged, setPersistence, indexedDBLocalPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const DEFAULT_CONFIG={ title:"NEON VS CLASH", subtitle:"Fighting Game Tournament · Inscriptions", logo:"",
   name:"NEON CLASH 2026", url:"https://neonclash.gg",
   addr:"Le Cyber Arena, 12 Av. des Îles d'Or, 83400 Hyères", date:"2026-09-19", time:"10:00",
   games:["Street Fighter 6","Tekken 8","Mortal Kombat 1","Guilty Gear Strive"], open:true,
-  pricePerGame:0, paymentLink:"" };
+  pricePerGame:0, paymentLink:"",
+  docReglement:"", docParentale:"", docImage:"" }; // documents téléchargeables de l'événement (URL ou chemin docs/...)
 
 let config={...DEFAULT_CONFIG}, regs=[], brackets={}, seasons=[];
 let configLoaded=false; // vrai config reçue (Firestore ou cache local) — évite le flash « NEON VS CLASH »
 let events=[], currentEventId=null;  // multi-événements : liste + événement actif (admin)
 let isAdmin=false, curAtab="ins", pubBracketGame=null, adminBrkGame=null, genFormat="single";
+let playerUser=null, playerProfile=null, myRegs=[]; // session JOUEUR (compte public, distinct du staff)
 let pubLigueGame=null, adminLigueGame=null, adminLigueYear=new Date().getFullYear();
 let db=null, auth=null, DEMO=true;
 let swapMode=false, swapPick=null;
@@ -744,6 +746,7 @@ function toast(m,err=false){const t=$("#toast");t.textContent=m;t.className="toa
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("load "+src));document.head.appendChild(s);});}
 
 Object.assign(window,{$,go,lookupMe,cancelMe,adminTryLogin,adminLogout,renderAdminTable,exportCSV,
+  playerLogin,playerLogout,forgotPassword,saveMyProfile,myAvatarPick,
   setFmt,onBrkGameChange,genBracket,clearBracket,bump,editReg,delReg,addGame,rmGame,saveSettings,
   exportBracketPDF,exportPodiumImage,addPlayerManual,makeQR,downloadQR,copyEmails,shuffleBracket,toggleSwap,pickSwap,
   closeTournament,renderAdminLigue,deleteSeason,toggleBracketVisibility,updatePriceRecap,togglePaid,togglePresent,
@@ -799,20 +802,36 @@ async function boot(){
       if(isAdmin&&curAtab==="lig") renderAdminLigue();
     }, ()=>{ /* lecture publique, devrait passer */ });
     onAuthStateChanged(auth, async user=>{
-      isAdmin=!!user;
-      $("#adminLogin").classList.toggle("hidden",isAdmin);
-      if(isAdmin){
-        // récupérer le rôle (par défaut : modérateur si aucun document trouvé)
-        try{
-          const snap = await getDoc(doc(db,"roles",user.uid));
-          userRole = (snap.exists() && snap.data().role==="admin") ? "admin" : "mod";
-        }catch(e){ userRole="mod"; }
-        const roleLabel = userRole==="admin" ? "👑 Administrateur" : "🛡 Modérateur";
-        $("#adminWho").innerHTML = `Connecté : ${esc(user.email)} <span class="pill" style="margin-left:8px;color:${userRole==='admin'?'var(--jaune)':'var(--violet-2)'};border-color:${userRole==='admin'?'var(--jaune)':'var(--violet)'}">${roleLabel}</span>`;
-        renderAdminAll();
+      if(user){
+        // STAFF = possède un document roles/{uid} ({role:"admin"} ou {role:"mod"}).
+        // Sans ce document, le compte est un JOUEUR (comptes publics auto-créés).
+        let snap=null;
+        try{ snap=await getDoc(doc(db,"roles",user.uid)); }catch(e){}
+        if(snap && snap.exists()){
+          // ----- session STAFF (comportement historique)
+          playerUser=null; playerProfile=null; myRegs=[];
+          isAdmin=true;
+          userRole = snap.data().role==="admin" ? "admin" : "mod";
+          $("#adminLogin").classList.add("hidden");
+          const roleLabel = userRole==="admin" ? "👑 Administrateur" : "🛡 Modérateur";
+          $("#adminWho").innerHTML = `Connecté : ${esc(user.email)} <span class="pill" style="margin-left:8px;color:${userRole==='admin'?'var(--jaune)':'var(--violet-2)'};border-color:${userRole==='admin'?'var(--jaune)':'var(--violet)'}">${roleLabel}</span>`;
+          renderAdminAll();
+        } else {
+          // ----- session JOUEUR : jamais d'accès staff
+          isAdmin=false; userRole=null;
+          playerUser=user;
+          await loadPlayerProfile();
+          $("#adminLogin").classList.remove("hidden");
+          const note=$("#adminLoginNote");
+          if(note) note.innerHTML='<div class="notice" style="margin-top:12px">🎮 Tu es connecté avec un <b>compte joueur</b>'+(playerProfile?` (${esc(playerProfile.pseudo||"")})`:"")+'. Cet espace est réservé à l\'organisation.</div>';
+        }
       } else {
-        userRole=null;
+        isAdmin=false; userRole=null; playerUser=null; playerProfile=null; myRegs=[];
+        $("#adminLogin").classList.remove("hidden");
+        const note=$("#adminLoginNote"); if(note) note.innerHTML="";
+        $("#adminPanel").classList.add("hidden");
       }
+      renderProfileView(); renderRegIdentity();
       applyLicenseGate(); // affiche le panneau OU le blocage licence selon l'état
     });
     initLicenseWatch(); // surveille l'état de licence en direct (verrou admin)
@@ -951,6 +970,136 @@ async function rebuildClaims(){
 }
 window.rebuildClaims=rebuildClaims;
 
+/* ===========================================================
+   COMPTES JOUEURS (Firebase Auth, distincts du staff)
+   - players/{uid}  : profil (pseudo, identité, date de naissance, avatar…)
+   - pseudos/{pseudoLower} : réservation globale du pseudo + e-mail de connexion
+     (permet de se connecter avec le pseudo OU l'e-mail)
+   - une inscription créée par un joueur connecté porte son uid
+=========================================================== */
+function ageFromBirthdate(b){
+  if(!b) return null;
+  const d=new Date(b+"T00:00:00"); if(isNaN(d)) return null;
+  const now=new Date();
+  let a=now.getFullYear()-d.getFullYear();
+  const m=now.getMonth()-d.getMonth();
+  if(m<0 || (m===0 && now.getDate()<d.getDate())) a--;
+  return a;
+}
+function pseudoKey(p){ return (p||"").trim().toLowerCase(); }
+
+async function loadPlayerProfile(){
+  if(!playerUser){ playerProfile=null; myRegs=[]; return; }
+  try{ const snap=await getDoc(doc(db,"players",playerUser.uid)); playerProfile=snap.exists()?{uid:playerUser.uid,...snap.data()}:null; }
+  catch(e){ console.error("profil",e); playerProfile=null; }
+  await loadMyRegs();
+}
+async function loadMyRegs(){
+  myRegs=[];
+  if(!playerUser) return;
+  try{
+    const qs=await getDocs(query(collection(db,"registrations"), where("uid","==",playerUser.uid)));
+    myRegs=qs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  }catch(e){ console.error("mes inscriptions",e); }
+}
+
+/* connexion : identifiant = pseudo OU e-mail */
+async function playerLogin(){
+  if(DEMO) return toast("Mode démo : pas de comptes joueurs.",true);
+  const idf=($("#plId")?.value||"").trim(), pass=$("#plPass")?.value||"";
+  if(!idf||!pass) return toast("Entre ton identifiant (pseudo ou e-mail) et ton mot de passe.",true);
+  let email=idf;
+  if(!idf.includes("@")){
+    try{
+      const m=await getDoc(doc(db,"pseudos",pseudoKey(idf)));
+      if(!m.exists()) return toast("Pseudo inconnu — essaie avec ton adresse e-mail.",true);
+      email=m.data().email;
+    }catch(e){ return toast("Pseudo inconnu — essaie avec ton adresse e-mail.",true); }
+  }
+  try{
+    await signInWithEmailAndPassword(auth,email,pass);
+    toast("Connecté ✓"); go("moi");
+  }catch(e){
+    console.error(e);
+    toast(String(e&&e.code).includes("too-many") ? "Trop de tentatives — réessaie dans quelques minutes." : "Identifiant ou mot de passe incorrect.",true);
+  }
+}
+async function playerLogout(){ try{ await signOut(auth); toast("Déconnecté."); }catch(e){} }
+async function forgotPassword(){
+  if(DEMO) return;
+  let email=($("#plId")?.value||"").trim();
+  if(!email.includes("@")){
+    if(email){ try{ const m=await getDoc(doc(db,"pseudos",pseudoKey(email))); if(m.exists()) email=m.data().email; }catch(e){} }
+    if(!email.includes("@")) email=prompt("Ton adresse e-mail de compte :","")||"";
+  }
+  if(!email.includes("@")) return;
+  try{ await sendPasswordResetEmail(auth,email.trim()); toast("E-mail de réinitialisation envoyé — vérifie aussi tes spams."); }
+  catch(e){ console.error(e); toast("Impossible d'envoyer l'e-mail (adresse inconnue ?).",true); }
+}
+
+/* avatar : image locale → redimensionnée (160px, JPEG) → stockée dans le profil */
+function myAvatarPick(input){
+  const file=input && input.files && input.files[0]; if(!file) return;
+  const img=new Image();
+  img.onload=async()=>{
+    try{
+      let size=160, quality=0.82, data="";
+      for(let attempt=0;attempt<3;attempt++){
+        const c=document.createElement("canvas"); c.width=size; c.height=size;
+        const ctx=c.getContext("2d");
+        const side=Math.min(img.width,img.height);
+        ctx.drawImage(img,(img.width-side)/2,(img.height-side)/2,side,side,0,0,size,size);
+        data=c.toDataURL("image/jpeg",quality);
+        if(data.length<=90000) break;        // garde le document léger
+        size=Math.round(size*0.7); quality=0.7;
+      }
+      await setDoc(doc(db,"players",playerUser.uid),{...stripUid(playerProfile),avatar:data});
+      playerProfile={...playerProfile,avatar:data};
+      renderProfileView(); toast("Avatar mis à jour ✓");
+    }catch(e){ console.error(e); toast("Impossible d'enregistrer l'avatar.",true); }
+    URL.revokeObjectURL(img.src);
+  };
+  img.onerror=()=>toast("Image illisible.",true);
+  img.src=URL.createObjectURL(file);
+}
+function stripUid(p){ const {uid,...rest}=p||{}; return rest; }
+
+/* enregistrement du profil (et synchronisation des inscriptions en cours) */
+async function saveMyProfile(){
+  if(!playerUser||!playerProfile) return;
+  const g=id=>($("#"+id)?.value||"").trim();
+  const pseudo=g("myPseudo"), prenom=g("myPrenom"), nom=g("myNom"), ville=g("myVille"), tel=g("myTel"), birth=g("myBirth");
+  if(!pseudo) return toast("Le pseudo est obligatoire.",true);
+  const a=ageFromBirthdate(birth);
+  if(birth && (a==null||a<6||a>120)) return toast("Date de naissance invalide.",true);
+  const oldPseudo=playerProfile.pseudo||"", changed=pseudoKey(pseudo)!==pseudoKey(oldPseudo);
+  try{
+    if(changed){
+      // le pseudo est unique GLOBALEMENT (comptes) : vérifier puis basculer la réservation
+      const m=await getDoc(doc(db,"pseudos",pseudoKey(pseudo)));
+      if(m.exists() && m.data().uid!==playerUser.uid) return toast("Ce pseudo est déjà utilisé par un autre compte.",true);
+      await setDoc(doc(db,"pseudos",pseudoKey(pseudo)),{uid:playerUser.uid,email:playerProfile.email||playerUser.email||""});
+      if(pseudoKey(oldPseudo)) { try{ await deleteDoc(doc(db,"pseudos",pseudoKey(oldPseudo))); }catch(e){} }
+    }
+    const prof={...stripUid(playerProfile),pseudo,prenom,nom,ville,telephone:tel,birthdate:birth};
+    await setDoc(doc(db,"players",playerUser.uid),prof);
+    playerProfile={uid:playerUser.uid,...prof};
+    // synchroniser les inscriptions des événements encore ouverts (pas l'historique)
+    for(const r of myRegs){
+      const ev=events.find(e=>e.id===r.eventId);
+      if(ev && ev.closed) continue;
+      const patch={...r,pseudo,prenom,nom,ville,telephone:tel,birthdate:birth,age:a!=null?String(a):(r.age||"")};
+      const {id,...rest}=patch;
+      try{
+        await setDoc(doc(db,"registrations",r.id),rest);
+        if(changed){ await freeClaims(r.eventId,r.email,oldPseudo); await createClaims(r.eventId,r.email,pseudo,r.code||r.id); }
+      }catch(e){ console.error("sync reg",r.id,e); }
+    }
+    await loadMyRegs();
+    renderProfileView(); toast("Profil enregistré ✓");
+  }catch(e){ console.error(e); toast("Erreur d'enregistrement du profil.",true); }
+}
+
 /* ---------- COMPTEURS PUBLICS ----------
    Les visiteurs ne peuvent pas lire la liste des inscriptions (protection des e-mails) :
    leurs compteurs proviennent de champs agrégés SANS donnée personnelle stockés sur
@@ -1052,7 +1201,11 @@ function go(view){
   if(view==="inscription") _formShownAt=Date.now(); // anti-spam : le chrono démarre à l'arrivée sur le formulaire
   if(view==="brackets") renderPubBracket();
   if(view==="ligue"){ renderPubLigueTabs(); renderPubLigue(); renderPalmares(); }
-  if(view==="moi"){ const saved=localStorage.getItem("fgc_myCode"); if(saved&&!$("#lookupCode").value){ $("#lookupCode").value=saved; lookupMe(true); } }
+  if(view==="moi"){
+    renderProfileView();
+    // repli « code » : pré-remplir uniquement pour les visiteurs sans compte
+    if(!playerUser && !isAdmin){ const saved=localStorage.getItem("fgc_myCode"); const lc=$("#lookupCode"); if(saved&&lc&&!lc.value){ lc.value=saved; const z=$("#legacyZone"); if(z) z.style.display=""; lookupMe(true); } }
+  }
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
@@ -1155,8 +1308,34 @@ function selectPubEvent(id){
   renderHeader(); renderHome(); renderGamePick(); renderPubBracketTabs();
   if(!$("#view-brackets").classList.contains("hidden")) renderPubBracket();
 }
+/* bloc « documents à télécharger » : construit depuis les réglages de l'événement */
+function renderRegDocs(){
+  const box=$("#regDocs"); if(!box) return;
+  const c=pubConfig();
+  const items=[];
+  if((c.docReglement||"").trim())  items.push(`<a href="${esc(c.docReglement.trim())}" target="_blank" rel="noopener" style="color:var(--cyan);text-decoration:underline;text-decoration-style:dotted">📘 Règlement de la compétition (à lire avant de t'inscrire)</a>`);
+  if((c.docParentale||"").trim())  items.push(`<a href="${esc(c.docParentale.trim())}" target="_blank" rel="noopener" style="color:var(--jaune);text-decoration:underline;text-decoration-style:dotted">📝 Autorisation parentale de participation (mineurs)</a>`);
+  if((c.docImage||"").trim())      items.push(`<a href="${esc(c.docImage.trim())}" target="_blank" rel="noopener" style="color:var(--jaune);text-decoration:underline;text-decoration-style:dotted">📸 Autorisation d'exploitation du droit à l'image (mineurs)</a>`);
+  if(!items.length){ box.innerHTML=""; return; }
+  const minors=(c.docParentale||c.docImage) ? `<div class="sub" style="font-size:11.5px;margin-top:8px"><b>Participants mineurs :</b> imprime et fais signer les autorisations par ton représentant légal, et présente-les à l'organisation le jour de l'événement (avec les pièces demandées).</div>` : "";
+  box.innerHTML=`<div class="notice" style="margin-top:16px;font-size:12.5px;line-height:1.7">
+    📄 <b>Documents à télécharger</b>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px">${items.join("")}</div>${minors}</div>`;
+}
+/* formulaire : masque les champs identité quand un joueur est connecté (pré-rempli) */
+function renderRegIdentity(){
+  const idBlock=$("#regIdentity"), banner=$("#regLoggedBanner");
+  if(!idBlock||!banner) return;
+  const logged=!!(playerProfile && !DEMO && !isAdmin);
+  idBlock.style.display=logged?"none":"";
+  const acc=$("#regAccountFields"); if(acc) acc.style.display=DEMO?"none":"";
+  banner.innerHTML=logged
+    ? `<div class="notice" style="border-left-color:var(--ok);margin-bottom:10px">🎮 Tu t'inscris en tant que <b style="color:var(--jaune)">${esc(playerProfile.pseudo||"")}</b> <span class="sub" style="font-size:11px">(${esc(playerProfile.email||"")})</span> — tes informations de profil seront utilisées. <a onclick="go('moi')" style="cursor:pointer;color:var(--cyan);text-decoration:underline dotted">Modifier mon profil</a></div>`
+    : "";
+}
 function renderGamePick(){
   _formShownAt=Date.now(); // anti-spam : on note quand le formulaire est affiché
+  renderRegDocs(); renderRegIdentity();
   const pubEvs=publicEvents();
   const closed=$("#regClosedMsg"),form=$("#regForm"),banner=$("#regEventBanner");
   // aucun événement public -> pas d'inscription possible
@@ -1206,47 +1385,95 @@ async function handleRegister(e){
   if(e&&e.preventDefault)e.preventDefault();
   const f=$("#regForm"),fd=new FormData(f);
   // --- anti-spam ---
-  // 1) champ piège : un humain ne le voit pas, un robot le remplit
   if((fd.get("website")||"").trim()!==""){ toast("Inscription envoyée !"); f.reset(); return; }
-  // 2) vitesse : un humain met plusieurs secondes à remplir le formulaire
   if(_formShownAt && (Date.now()-_formShownAt)<3000){ return toast("Doucement ! Vérifie tes informations puis renvoie.",true); }
   const games=[...f.querySelectorAll('input[name=game]:checked')].map(c=>c.value);
-  const pseudo=(fd.get("pseudo")||"").trim();
-  const prenom=(fd.get("prenom")||"").trim(),nom=(fd.get("nom")||"").trim(),age=(fd.get("age")||"").trim(),
-    ville=(fd.get("ville")||"").trim(),emailRaw=(fd.get("email")||"").trim(),tel=(fd.get("telephone")||"").trim();
-  if(!pseudo) return toast("Indique ton pseudo / gamertag.",true);
-  if(!prenom||!nom||!age||!ville||!emailRaw||!tel) return toast("Remplis tous les champs obligatoires.",true);
-  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailRaw)) return toast("E-mail invalide.",true);
   if(!games.length) return toast("Choisis au moins un jeu !",true);
   if(!f.querySelector('input[name=consent]')?.checked) return toast("Merci de cocher la case de consentement pour t'inscrire.",true);
   if(!f.querySelector('input[name=consentImage]')?.checked) return toast("Merci d'accepter les conditions relatives au droit à l'image pour t'inscrire.",true);
   const targetEvent = evPubId();
-  // doublons — contrôle local (efficace pour le staff connecté qui voit la liste)
-  if(regs.some(r=>r.eventId===targetEvent && r.email&&r.email.toLowerCase()===emailRaw.toLowerCase())) return toast("Cet e-mail est déjà inscrit à cet événement. Retrouve ta fiche via « Mon inscription » avec ton code.",true);
+  if(isAdmin && !DEMO) return toast("Tu es connecté avec un compte staff : ajoute le joueur depuis l'admin (« + Ajouter un joueur »), ou déconnecte-toi pour t'inscrire comme joueur.",true);
+  const logged = !!(playerProfile && !DEMO && !isAdmin);
+
+  // ----- identité : depuis le profil (connecté) ou depuis le formulaire
+  let pseudo,prenom,nom,ville,emailRaw,tel,birth,password="";
+  if(logged){
+    pseudo=(playerProfile.pseudo||"").trim(); prenom=(playerProfile.prenom||"").trim(); nom=(playerProfile.nom||"").trim();
+    ville=(playerProfile.ville||"").trim(); emailRaw=(playerProfile.email||playerUser.email||"").trim();
+    tel=(playerProfile.telephone||"").trim(); birth=(playerProfile.birthdate||"").trim();
+    if(!pseudo||!prenom||!nom||!ville||!tel||!birth) return toast("Ton profil est incomplet — complète-le d'abord (page « Mon profil »).",true);
+  } else {
+    pseudo=(fd.get("pseudo")||"").trim(); prenom=(fd.get("prenom")||"").trim(); nom=(fd.get("nom")||"").trim();
+    ville=(fd.get("ville")||"").trim(); emailRaw=(fd.get("email")||"").trim(); tel=(fd.get("telephone")||"").trim();
+    birth=(fd.get("birthdate")||"").trim();
+    password=fd.get("password")||"";
+    if(!pseudo) return toast("Indique ton pseudo / gamertag.",true);
+    if(!prenom||!nom||!birth||!ville||!emailRaw||!tel) return toast("Remplis tous les champs obligatoires.",true);
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailRaw)) return toast("E-mail invalide.",true);
+    if(!DEMO){
+      if((password||"").length<6) return toast("Choisis un mot de passe d'au moins 6 caractères.",true);
+      if(password!==(fd.get("password2")||"")) return toast("Les deux mots de passe ne correspondent pas.",true);
+    }
+  }
+  const age=ageFromBirthdate(birth);
+  if(age==null||age<6||age>120) return toast("Date de naissance invalide.",true);
+
+  // ----- doublons : contrôle local (staff) + réservations (visiteurs)
+  if(regs.some(r=>r.eventId===targetEvent && r.email&&r.email.toLowerCase()===emailRaw.toLowerCase())) return toast("Cet e-mail est déjà inscrit à cet événement.",true);
   if(regs.some(r=>r.eventId===targetEvent && (r.pseudo||"").trim().toLowerCase()===pseudo.toLowerCase())) return toast("Ce pseudo est déjà pris sur cet événement — choisis-en un autre.",true);
-  // doublons — contrôle via réservations (fonctionne pour les visiteurs, qui ne voient pas la liste)
   if(!DEMO){
     const c=claimIds(targetEvent,emailRaw,pseudo);
-    if(await claimExists(c.em)) return toast("Cet e-mail est déjà inscrit à cet événement. Retrouve ta fiche via « Mon inscription » avec ton code.",true);
+    if(await claimExists(c.em)) return toast(logged?"Tu es déjà inscrit à cet événement — retrouve ta fiche sur « Mon profil ».":"Cet e-mail est déjà inscrit à cet événement. Connecte-toi (page « Mon profil ») pour retrouver ta fiche.",true);
     if(await claimExists(c.ps)) return toast("Ce pseudo est déjà pris sur cet événement — choisis-en un autre.",true);
+    // pseudo unique GLOBALEMENT entre comptes
+    if(!logged){
+      try{ const pm=await getDoc(doc(db,"pseudos",pseudoKey(pseudo))); if(pm.exists()) return toast("Ce pseudo appartient déjà à un compte. Si c'est le tien, connecte-toi d'abord (page « Mon profil »).",true); }catch(e){}
+    }
   }
+
   const code=genCode();
   const price=Number(pubConfig().pricePerGame)||0;
   const amount=+(price*games.length).toFixed(2);
-  const reg={id:code,code,eventId:targetEvent,pseudo,prenom,nom,age,ville,email:emailRaw,telephone:tel,games,ts:Date.now(),amount,paid:amount===0,consent:true,consentImage:true};
   if(window._regBusy) return; window._regBusy=true; // anti double-clic sur « Valider »
   try{
+    let uid = logged ? playerUser.uid : null;
+    // ----- création du COMPTE joueur (première inscription)
+    if(!logged && !DEMO){
+      try{
+        const cred=await createUserWithEmailAndPassword(auth,emailRaw,password);
+        uid=cred.user.uid;
+      }catch(err){
+        window._regBusy=false;
+        const ec=String(err&&err.code);
+        if(ec.includes("email-already-in-use")) return toast("Un compte existe déjà avec cet e-mail — connecte-toi d'abord (page « Mon profil »), puis reviens t'inscrire.",true);
+        if(ec.includes("weak-password")) return toast("Mot de passe trop faible (6 caractères minimum).",true);
+        if(ec.includes("invalid-email")) return toast("E-mail invalide.",true);
+        console.error(err); return toast("Impossible de créer le compte — réessaie.",true);
+      }
+      const prof={pseudo,prenom,nom,ville,telephone:tel,birthdate:birth,email:emailRaw,avatar:"",createdAt:Date.now()};
+      try{
+        await setDoc(doc(db,"players",uid),prof);
+        await setDoc(doc(db,"pseudos",pseudoKey(pseudo)),{uid,email:emailRaw});
+      }catch(err){ console.error("profil",err); }
+      playerUser=auth.currentUser; playerProfile={uid,...prof};
+    }
+    const reg={id:code,code,eventId:targetEvent,pseudo,prenom,nom,age:String(age),birthdate:birth,ville,email:emailRaw,telephone:tel,games,ts:Date.now(),amount,paid:amount===0,consent:true,consentImage:true,...(uid?{uid}:{})};
     if(!DEMO) await createClaims(targetEvent,emailRaw,pseudo,code); // réserver e-mail + pseudo d'abord
     await saveReg(reg);
     bumpCounters(targetEvent,games,+1); // compteur public (sans donnée personnelle)
     localStorage.setItem("fgc_myCode",code);
     f.reset(); toast("Inscription validée ! 🎮");
     const emailed=await sendConfirmEmail(reg);
-    $("#lookupCode").value=code; go("moi"); showMyCard(reg,true,emailed);
+    if(uid && !DEMO){
+      await loadMyRegs();
+      go("moi"); renderProfileView();
+      if(emailed) toast("✉️ Confirmation envoyée — pense à vérifier tes spams.");
+    } else {
+      $("#lookupCode").value=code; go("moi"); showMyCard(reg,true,emailed);
+    }
   }catch(err){
     console.error(err);
     if(!DEMO) freeClaims(targetEvent,emailRaw,pseudo); // nettoyage best-effort
-    // une réservation déjà prise ressort en refus de permission → message doublon explicite
     toast(String(err&&err.code)==="permission-denied" ? "Inscription impossible : e-mail ou pseudo déjà utilisé sur cet événement." : "Erreur d'enregistrement.",true);
   } finally { window._regBusy=false; }
 }
@@ -1284,6 +1511,117 @@ async function sendConfirmEmail(reg){
     return true;
   }catch(e){ console.error("EmailJS:",e); return false; }
 }
+
+/* ---------- vue « Mon profil » : connexion, profil joueur, ou recherche par code ---------- */
+function legacyLookupHTML(openByDefault){
+  return `
+  <div class="panel" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="const z=$('#legacyZone');z.style.display=z.style.display==='none'?'':'none'">
+      <b style="font-size:13px">🔑 J'ai un code d'inscription (sans compte)</b><span class="sub" style="font-size:11px">afficher / masquer</span>
+    </div>
+    <div id="legacyZone" style="${openByDefault?'':'display:none;'}margin-top:10px">
+      <p class="sub" style="font-size:12px">Pour les inscriptions faites sur place ou avant la création des comptes : entre ton code personnel.</p>
+      <div class="grid2">
+        <div class="field"><label>Ton code</label><input id="lookupCode" placeholder="EX. K7M2QP9R" style="text-transform:uppercase;letter-spacing:2px" onkeydown="if(event.key==='Enter')lookupMe()"></div>
+        <div class="field" style="display:flex;align-items:flex-end"><button class="btn ghost" style="width:100%" onclick="lookupMe()">Retrouver ma fiche</button></div>
+      </div>
+    </div>
+    <div id="lookupResult"></div>
+  </div>`;
+}
+function renderProfileView(){
+  const root=$("#profileRoot"); if(!root) return;
+  // ----- mode démo : pas de comptes, uniquement la recherche par code
+  if(DEMO){
+    root.innerHTML=`<div class="panel corner"><h2>Mon inscription</h2>
+      <p class="sub">Mode démo : retrouve ta fiche avec ton code personnel.</p></div>`+legacyLookupHTML(true);
+    return;
+  }
+  // ----- staff connecté : cet onglet ne le concerne pas
+  if(isAdmin){
+    root.innerHTML=`<div class="panel corner"><h2>Mon profil</h2>
+      <p class="sub">Tu es connecté avec un compte <b>staff</b> — cet espace est celui des joueurs. Gère le tournoi depuis l'onglet Admin.</p></div>`+legacyLookupHTML(false);
+    return;
+  }
+  // ----- visiteur non connecté : connexion
+  if(!playerUser){
+    root.innerHTML=`
+    <div class="panel corner">
+      <h2>Mon profil joueur</h2>
+      <p class="sub">Connecte-toi avec ton <b style="color:var(--jaune)">pseudo ou ton e-mail</b> et ton mot de passe pour retrouver ta fiche, tes tournois et tes stats.</p>
+      <div class="grid2">
+        <div class="field"><label>Pseudo ou e-mail</label><input id="plId" autocomplete="username" placeholder="TonPseudo ou toi@mail.com" onkeydown="if(event.key==='Enter')playerLogin()"></div>
+        <div class="field"><label>Mot de passe</label><input id="plPass" type="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')playerLogin()"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn" onclick="playerLogin()">Se connecter ▸</button>
+        <a onclick="forgotPassword()" style="cursor:pointer;color:var(--cyan);font-size:12px;text-decoration:underline dotted">Mot de passe oublié ?</a>
+      </div>
+      <div class="notice" style="margin-top:16px">✨ <b>Pas encore de compte ?</b> Il se crée automatiquement lors de ta <b>première inscription à un tournoi</b> (page « S'inscrire ») : tu y choisis ton mot de passe.</div>
+    </div>`+legacyLookupHTML(false);
+    return;
+  }
+  // ----- joueur connecté : son profil
+  const p=playerProfile||{};
+  const age=ageFromBirthdate(p.birthdate);
+  const av=p.avatar?`<img src="${p.avatar}" alt="avatar" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:2px solid var(--violet);box-shadow:var(--glow-v)">`
+                   :`<div style="width:96px;height:96px;border-radius:50%;background:rgba(168,85,247,.15);border:2px dashed var(--violet);display:flex;align-items:center;justify-content:center;font-size:34px">🎮</div>`;
+  // inscriptions en cours (événements non masqués/clos en priorité)
+  const regsHTML = myRegs.length ? myRegs.map(r=>{
+    const ev=events.find(e=>e.id===r.eventId);
+    const evName=ev?(ev.name||"Événement"):"(événement supprimé)";
+    const past=ev&&ev.closed;
+    const amount=Number(r.amount)||0;
+    const pay=amount>0 ? (r.paid?'<span class="pill" style="color:var(--ok);border-color:var(--ok);font-size:10px">✓ payé</span>':'<span class="pill" style="color:var(--jaune);border-color:var(--jaune);font-size:10px">⏳ à régler</span>') : '';
+    return `<div class="panel" style="margin-top:10px;padding:12px 14px;${past?'opacity:.6':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <b style="font-size:13px;color:${past?'var(--muted)':'var(--jaune)'}">${esc(evName)}</b>
+        <span style="display:flex;gap:6px;align-items:center">${pay}${past?'<span class="pill" style="font-size:10px">terminé</span>':''}</span>
+      </div>
+      <div style="margin-top:6px">${(r.games||[]).map(g=>`<span class="badge">${esc(g)}</span>`).join(" ")}</div>
+      ${past?"":myMatchesHTML(r)}
+      ${past?"":`<button class="btn danger sm" style="margin-top:8px" onclick="cancelMe('${esc(r.code||r.id)}')">Annuler cette inscription</button>`}
+    </div>`;
+  }).join("") : '<p class="sub" style="font-size:12px">Aucune inscription pour le moment — passe par la page « S\'inscrire » !</p>';
+  root.innerHTML=`
+  <div class="panel corner">
+    <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+      <div style="position:relative">${av}
+        <label style="position:absolute;bottom:-4px;right:-4px;background:var(--jaune);color:#3a2e00;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px" title="Changer d'avatar">📷<input type="file" accept="image/*" style="display:none" onchange="myAvatarPick(this)"></label>
+      </div>
+      <div>
+        <h2 style="margin:0;color:var(--jaune)">${esc(p.pseudo||"Joueur")}</h2>
+        <div class="sub" style="margin:2px 0 0">${esc(p.prenom||"")} ${esc(p.nom||"")}${age!=null?` · ${age} ans`:""}</div>
+        <div class="sub" style="font-size:11px;margin-top:2px">${esc(p.email||playerUser.email||"")}</div>
+      </div>
+    </div>
+    <hr class="soft" style="border:0;border-top:1px solid var(--line);margin:16px 0">
+    <h2 style="font-size:15px">Mes informations</h2>
+    <div class="grid2" style="margin-top:8px">
+      <div class="field"><label>Pseudo / Gamertag</label><input id="myPseudo" maxlength="40" value="${esc(p.pseudo||"")}"></div>
+      <div class="field"><label>Ville</label><input id="myVille" maxlength="60" value="${esc(p.ville||"")}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Prénom</label><input id="myPrenom" maxlength="40" value="${esc(p.prenom||"")}"></div>
+      <div class="field"><label>Nom</label><input id="myNom" maxlength="40" value="${esc(p.nom||"")}"></div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Date de naissance <span class="sub" style="font-size:10px">(ton âge s'affiche automatiquement)</span></label><input id="myBirth" type="date" value="${esc(p.birthdate||"")}"></div>
+      <div class="field"><label>Téléphone</label><input id="myTel" maxlength="25" value="${esc(p.telephone||"")}"></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn sm" onclick="saveMyProfile()">💾 Enregistrer mon profil</button>
+      <button class="btn ghost sm" onclick="showPlayerCard('${esc(p.pseudo||"").replace(/'/g,"\\'")}')">📊 Mon parcours & mes stats</button>
+      <button class="btn ghost sm" onclick="playerLogout()">Se déconnecter</button>
+    </div>
+    <p class="sub" style="font-size:11px;margin-top:8px">Si tu changes de pseudo, tes inscriptions en cours sont mises à jour ; l'historique de Ligue garde l'ancien nom (l'organisation peut fusionner les deux).</p>
+  </div>
+  <div class="panel corner" style="margin-top:16px">
+    <h2 style="font-size:15px">🎟 Mes tournois</h2>
+    ${regsHTML}
+  </div>`+legacyLookupHTML(false);
+}
+window.renderProfileView=renderProfileView;
 
 async function lookupMe(silent){
   const code=($("#lookupCode").value||"").trim().toUpperCase();
@@ -1431,7 +1769,10 @@ async function cancelMe(id){
   if(!confirm("Annuler définitivement ton inscription ?"))return;
   await removeReg(id);
   if(localStorage.getItem("fgc_myCode")===id) localStorage.removeItem("fgc_myCode");
-  $("#lookupResult").innerHTML="";$("#lookupCode").value=""; toast("Inscription annulée.");
+  const lr=$("#lookupResult"); if(lr) lr.innerHTML="";
+  const lc=$("#lookupCode"); if(lc) lc.value="";
+  toast("Inscription annulée.");
+  if(playerUser){ await loadMyRegs(); renderProfileView(); }
 }
 
 /* ---------- moteur brackets ---------- */
@@ -3234,6 +3575,9 @@ function renderSettings(){
   $("#setName").value=config.name;$("#setUrl").value=config.url;$("#setAddr").value=config.addr;
   $("#setDate").value=config.date;$("#setTime").value=config.time;$("#setOpen").value=config.open?"1":"0";
   $("#setPrice").value=config.pricePerGame||0; $("#setPay").value=config.paymentLink||"";
+  if($("#setDocReglement")) $("#setDocReglement").value=config.docReglement||"";
+  if($("#setDocParentale")) $("#setDocParentale").value=config.docParentale||"";
+  if($("#setDocImage")) $("#setDocImage").value=config.docImage||"";
   if($("#setSponsorsGlobal")) $("#setSponsorsGlobal").value=(globalSponsors||[]).join("\n");
   if($("#setSponsorsEvent")) $("#setSponsorsEvent").value=(config.sponsors||[]).join("\n");
   if(!$("#qrUrl").value) $("#qrUrl").value=location.href.split("#")[0];
@@ -3251,6 +3595,9 @@ async function saveSettings(){
   config.date=$("#setDate").value;config.time=$("#setTime").value;config.open=$("#setOpen").value==="1";
   config.pricePerGame=Math.max(0,parseFloat($("#setPrice").value)||0);
   config.paymentLink=$("#setPay").value.trim();
+  config.docReglement=($("#setDocReglement")?.value||"").trim();
+  config.docParentale=($("#setDocParentale")?.value||"").trim();
+  config.docImage=($("#setDocImage")?.value||"").trim();
   config.sponsors=($("#setSponsorsEvent")?.value||"").split("\n").map(s=>s.trim()).filter(Boolean);
   globalSponsors=($("#setSponsorsGlobal")?.value||"").split("\n").map(s=>s.trim()).filter(Boolean);
   try{
