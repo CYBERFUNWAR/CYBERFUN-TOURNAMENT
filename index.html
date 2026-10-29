@@ -184,6 +184,10 @@
   .match{position:relative;background:var(--panel-2);border:1px solid var(--line);border-radius:10px;overflow:visible}
   .station-tag{position:absolute;bottom:-9px;right:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:0 6px;font-size:10px;color:var(--cyan);z-index:3;line-height:16px}
   .station-edit{position:absolute;bottom:-10px;right:8px;z-index:3;display:flex;align-items:center;gap:3px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:0 4px;font-size:10px;color:var(--muted);line-height:18px}
+  .live-btn{border:1px solid var(--line);background:rgba(10,6,18,.5);color:var(--muted);border-radius:6px;font-size:10px;line-height:16px;padding:0 5px;cursor:pointer}
+  .live-btn.on{background:rgba(255,77,109,.2);border-color:#ff4d6d;color:#ff4d6d;box-shadow:0 0 8px rgba(255,77,109,.5)}
+  .match.live{border-color:#ff4d6d!important;box-shadow:0 0 14px rgba(255,77,109,.35)}
+  .live-tag{position:absolute;top:-10px;left:8px;z-index:3;background:#2a0a14;border:1px solid #ff4d6d;color:#ff4d6d;border-radius:6px;font-size:9px;letter-spacing:1px;padding:1px 6px;font-weight:700}
   .station-edit input{width:36px;font-size:10px;padding:0 2px;border:none;background:transparent;color:var(--cyan);text-align:center;outline:none}
   /* variante inline du poste, pour les cartes de groupes/poules Capcom */
   .station-inline{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:6px;padding:0 5px;font-size:10px;color:var(--cyan);line-height:16px;background:rgba(10,6,18,.5);text-transform:none;letter-spacing:0}
@@ -2317,7 +2321,7 @@ function capcomPhase2HTML(game, editable){
 function capcomStationHTML(game, fullKey, m, editable){
   const bk=getBk(game); const stv=(((bk||{}).stations)||{})[fullKey]||"";
   if(editable && m.p1 && m.p2 && !m.winner)
-    return `<span class="station-inline">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','${fullKey}',this.value)"></span>`;
+    return `<span class="station-inline">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','${fullKey}',this.value)"></span>`+liveBtnHTML(game,fullKey,bk||{});
   return (stv && !m.winner) ? `<span class="station-inline">🖥 Poste ${esc(stv)}</span>` : "";
 }
 
@@ -2334,10 +2338,11 @@ function capcomPhase3HTML(game, editable){
       col.matches.forEach(m=>{
         const ftTag=(m.p1&&m.p2)?`<span class="ft-tag">FT${ftFor(p3,m.key)}</span>`:"";
         const stv=((bk.stations||{})["p3-"+m.key]||"");
+        const isLiveP3=!!((bk.live||{})["p3-"+m.key]) && m.p1 && m.p2 && !m.winner;
         const station=(editable && m.p1 && m.p2 && !m.winner)
-          ? `<div class="station-edit">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','p3-${m.key}',this.value)"></div>`
+          ? `<div class="station-edit">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','p3-${m.key}',this.value)">${liveBtnHTML(game,"p3-"+m.key,bk)}</div>`
           : (stv && !m.winner ? `<div class="station-tag">🖥 Poste ${esc(stv)}</div>` : "");
-        html+='<div class="match">'+ftTag+capcomP3Slot(game,m,"p1",editable)+capcomP3Slot(game,m,"p2",editable)+station+'</div>';
+        html+='<div class="match'+(isLiveP3?' live':'')+'">'+(isLiveP3?'<span class="live-tag">🔴 EN COURS</span>':'')+ftTag+capcomP3Slot(game,m,"p1",editable)+capcomP3Slot(game,m,"p2",editable)+station+'</div>';
       });
       html+='</div>';
     });
@@ -2396,7 +2401,7 @@ function raceHeatHTML(game, bk, ht, editable){
   const editPts=!!raceEditPts[key];
   const stv=((bk.stations||{})[key]||"");
   const station = editable
-    ? `<span class="station-inline">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','${key}',this.value)"></span>`
+    ? `<span class="station-inline">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','${key}',this.value)"></span>`+(ht.st.decided?"":liveBtnHTML(game,key,bk))
     : (stv && !ht.st.decided ? `<span class="station-inline">🖥 Poste ${esc(stv)}</span>` : "");
   // en-tête : sélecteur de course (admin) + poste
   let h=`<div class="heat-head">`;
@@ -2614,10 +2619,12 @@ function bracketHTML(game,editable){
         const ftTag=(m.p1&&m.p2)?`<span class="ft-tag">FT${ftFor(bk,m.key)}</span>`:"";
         // numéro de poste/table : saisie pour admin+mod (matchs jouables), étiquette en lecture sinon
         const stv=((bk.stations||{})[m.key]||"");
+        const isLive=!!((bk.live||{})[m.key]) && m.p1 && m.p2 && !m.winner;
         const station = (editable && m.p1 && m.p2 && !m.winner)
-          ? `<div class="station-edit">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','${m.key}',this.value)"></div>`
+          ? `<div class="station-edit">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','${m.key}',this.value)">${liveBtnHTML(game,m.key,bk)}</div>`
           : (stv && !m.winner ? `<div class="station-tag">🖥 Poste ${esc(stv)}</div>` : "");
-        html+='<div class="match" data-mkey="'+esc(m.key)+'">'+ftTag+slotHTML(game,m,"p1",editable)+slotHTML(game,m,"p2",editable)+station+'</div>';
+        const liveTag=isLive?'<span class="live-tag">🔴 EN COURS</span>':'';
+        html+='<div class="match'+(isLive?' live':'')+'" data-mkey="'+esc(m.key)+'">'+liveTag+ftTag+slotHTML(game,m,"p1",editable)+slotHTML(game,m,"p2",editable)+station+'</div>';
       });
       html+='</div>';
     });
@@ -4010,6 +4017,19 @@ function setLigueEvent(id){ ligueEventFilter=id; renderPubLigueTabs(); renderPub
 ============================================================ */
 let _regieTimer=null, _regieIndex=0, _regiePaused=false, _regieScroll={};
 /* assigne un numéro de poste/table à un match (accessible admin ET modérateur) */
+/* marquer un match « EN COURS » (affiché en priorité sur l'écran régie) */
+async function toggleLive(game,key){
+  const bk=getBk(game); if(!bk) return;
+  const live={...(bk.live||{})};
+  if(live[key]) delete live[key]; else live[key]=true;
+  try{ await saveBracket(game,{...bk,live}); toast(live[key]?"🔴 Match annoncé EN COURS (visible en régie).":"Match retiré des « en cours »."); }
+  catch(e){ console.error(e); toast("Erreur d'enregistrement.",true); }
+}
+window.toggleLive=toggleLive;
+function liveBtnHTML(game,key,bk){
+  const on=!!((bk.live||{})[key]);
+  return `<button class="live-btn${on?" on":""}" onclick="toggleLive('${game}','${key}')" title="${on?"Match EN COURS — cliquer pour le retirer":"Annoncer ce match EN COURS (mis en avant sur l'écran régie)"}">${on?"🔴":"▶"}</button>`;
+}
 async function setStation(game,key,val){
   const bk=getBk(game); if(!bk) return;
   const stations={...(bk.stations||{})};
@@ -4024,25 +4044,68 @@ async function setStation(game,key,val){
 function regieMatchListHTML(data, banner){
   let html='<div style="height:100%;display:flex;flex-direction:column;gap:24px">'+(banner||"");
   if(data.ready.length){
-    const many=data.ready.length>4; // beaucoup de matchs : grille 2 colonnes, cartes compactes
-    html+='<div><div style="font-size:clamp(18px,2.4vw,32px);color:#4dffa1;margin-bottom:16px;font-weight:700">▶ À JOUER MAINTENANT</div><div style="display:grid;grid-template-columns:'+(many?"repeat(auto-fit,minmax(420px,1fr))":"1fr")+';gap:'+(many?"10px":"14px")+'">';
-    data.ready.slice(0,12).forEach(m=>{
-      const ns=many?"clamp(16px,1.8vw,26px)":"clamp(22px,3.2vw,44px)";
-      const stationCell=`<span style="min-width:${many?"95px":"140px"};text-align:right">${m.station?`<b style="display:block;font-size:${many?"clamp(13px,1.5vw,20px)":"clamp(16px,2vw,28px)"};color:#4dffa1">🖥 Poste ${esc(m.station)}</b>`:""}<span style="font-size:clamp(10px,1.1vw,14px);color:#a855f7">${esc(m.round)}</span></span>`;
-      if(m.players){
-        // manche de course : 2 à 4 joueurs « chacun pour soi »
-        const names=m.players.map(n=>`<span style="font-weight:700;font-size:${ns}">${esc(n)}</span>`).join('<span style="color:#ffe23d;font-family:\'Orbitron\',sans-serif;font-size:clamp(11px,1.2vw,16px);padding:0 4px">·</span>');
-        html+=`<div style="display:flex;align-items:center;gap:14px;background:rgba(77,255,161,.08);border:1px solid rgba(77,255,161,.3);border-radius:14px;padding:${many?"10px 18px":"16px 24px"}">
-          <span style="flex:1;display:flex;flex-wrap:wrap;gap:6px;align-items:center">${names}</span>${stationCell}</div>`;
-      } else {
-        html+=`<div style="display:flex;align-items:center;gap:14px;background:rgba(77,255,161,.08);border:1px solid rgba(77,255,161,.3);border-radius:14px;padding:${many?"10px 18px":"18px 28px"}">
-          <span style="flex:1;text-align:right;font-size:${ns};font-weight:700">${esc(m.a)}</span>
-          <span style="font-size:clamp(13px,1.4vw,20px);color:#ffe23d;font-family:'Orbitron',sans-serif">VS</span>
-          <span style="flex:1;font-size:${ns};font-weight:700">${esc(m.b)}</span>${stationCell}</div>`;
-      }
+    // ---- priorité aux matchs annoncés EN COURS (drapeau 🔴 posé par le staff) ;
+    //      sinon, séparation « sur les postes » / « en attente de poste »
+    const byStation=(x,y)=>{
+      if(!!x.station!==!!y.station) return x.station?-1:1;
+      const nx=parseInt(x.station,10), ny=parseInt(y.station,10);
+      if(!isNaN(nx)&&!isNaN(ny)) return nx-ny;
+      return String(x.station).localeCompare(String(y.station),"fr",{numeric:true});
+    };
+    const liveList=data.ready.filter(m=>m.live).sort(byStation);
+    const withSt=data.ready.filter(m=>m.station).sort((x,y)=>{
+      const nx=parseInt(x.station,10), ny=parseInt(y.station,10);
+      if(!isNaN(nx)&&!isNaN(ny)) return nx-ny;
+      return String(x.station).localeCompare(String(y.station),"fr",{numeric:true});
     });
-    if(data.ready.length>12) html+=`<div style="font-size:clamp(12px,1.4vw,18px);color:#888;align-self:center">… et ${data.ready.length-12} autre(s) match(s)</div>`;
-    html+='</div></div>';
+    const noSt=data.ready.filter(m=>!m.station);
+    const CAP=8; // par colonne
+    const card=(m,compact,waiting)=>{
+      const ns=compact?"clamp(15px,1.7vw,24px)":"clamp(20px,2.6vw,36px)";
+      const bg=waiting==="live"?"rgba(255,77,109,.10)":(waiting?"rgba(255,226,61,.06)":"rgba(77,255,161,.08)");
+      const bd=waiting==="live"?"rgba(255,77,109,.5)":(waiting?"rgba(255,226,61,.35)":"rgba(77,255,161,.3)");
+      const stationCell=`<span style="min-width:${compact?"90px":"120px"};text-align:right">${m.station?`<b style="display:block;font-size:${compact?"clamp(13px,1.5vw,20px)":"clamp(15px,1.9vw,26px)"};color:#4dffa1">🖥 Poste ${esc(m.station)}</b>`:""}<span style="font-size:clamp(10px,1.1vw,14px);color:#a855f7">${esc(m.round)}</span></span>`;
+      const pad=compact?"9px 16px":"14px 22px";
+      if(m.players){
+        const names=m.players.map(n=>`<span style="font-weight:700;font-size:${ns}">${esc(n)}</span>`).join('<span style="color:#ffe23d;font-family:\'Orbitron\',sans-serif;font-size:clamp(11px,1.2vw,16px);padding:0 4px">·</span>');
+        return `<div style="display:flex;align-items:center;gap:12px;background:${bg};border:1px solid ${bd};border-radius:14px;padding:${pad}">
+          <span style="flex:1;display:flex;flex-wrap:wrap;gap:6px;align-items:center">${names}</span>${stationCell}</div>`;
+      }
+      return `<div style="display:flex;align-items:center;gap:12px;background:${bg};border:1px solid ${bd};border-radius:14px;padding:${pad}">
+        <span style="flex:1;text-align:right;font-size:${ns};font-weight:700">${esc(m.a)}</span>
+        <span style="font-size:clamp(12px,1.3vw,18px);color:#ffe23d;font-family:'Orbitron',sans-serif">VS</span>
+        <span style="flex:1;font-size:${ns};font-weight:700">${esc(m.b)}</span>${stationCell}</div>`;
+    };
+    const colHTML=(title,color,list,waiting)=>{
+      const compact=list.length>4;
+      let c=`<div><div style="font-size:clamp(15px,1.9vw,26px);color:${color};margin-bottom:12px;font-weight:700;letter-spacing:1px">${title}</div><div style="display:flex;flex-direction:column;gap:${compact?"8px":"12px"}">`;
+      list.slice(0,CAP).forEach(m=>{ c+=card(m,compact,waiting); });
+      if(list.length>CAP) c+=`<div style="font-size:clamp(12px,1.4vw,18px);color:#888;text-align:center">… et ${list.length-CAP} autre(s)</div>`;
+      return c+'</div></div>';
+    };
+    html+='<div><div style="font-size:clamp(18px,2.4vw,32px);color:#4dffa1;margin-bottom:16px;font-weight:700">▶ À JOUER MAINTENANT</div>';
+    if(liveList.length){
+      // mode « annonce » : les matchs lancés à gauche en rouge, le reste en attente
+      const waitList=data.ready.filter(m=>!m.live).sort(byStation);
+      if(waitList.length){
+        html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">'
+             + colHTML("🔴 EN COURS","#ff4d6d",liveList,"live")
+             + colHTML("⏳ EN ATTENTE","#ffe23d",waitList,true)
+             + '</div>';
+      } else {
+        html+=colHTML("🔴 EN COURS","#ff4d6d",liveList,"live");
+      }
+    } else if(withSt.length && noSt.length){
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start">'
+           + colHTML("🖥 SUR LES POSTES","#4dffa1",withSt,false)
+           + colHTML("⏳ EN ATTENTE DE POSTE","#ffe23d",noSt,true)
+           + '</div>';
+    } else if(withSt.length){
+      html+=colHTML("🖥 SUR LES POSTES","#4dffa1",withSt,false);
+    } else {
+      html+=colHTML("⏳ EN ATTENTE DE POSTE","#ffe23d",noSt,true);
+    }
+    html+='</div>';
   } else {
     html+='<div style="font-size:clamp(20px,3vw,40px);color:#888;text-align:center;margin-top:40px">Aucun match prêt — en attente de résultats</div>';
   }
@@ -4059,7 +4122,7 @@ function regieMatchesFor(game){
   if(!bk) return null;
   // ===== Capcom Cup : on collecte les matchs jouables de la phase en cours
   if(bk.type==="capcom"){
-    const phase=bk.phase||1, ready=[], upcoming=[], st=bk.stations||{};
+    const phase=bk.phase||1, ready=[], upcoming=[], st=bk.stations||{}, lv=bk.live||{};
     let phaseInfo="";
     if(phase===1){
       let done=0;
@@ -4070,7 +4133,7 @@ function regieMatchesFor(game){
         r.matches.forEach(m=>{
           if(m.winner)return;
           const lbl=`Groupe ${gi+1} · ${m.label}`;
-          if(m.p1&&m.p2) ready.push({round:lbl,a:m.p1.name,b:m.p2.name,station:st[`p1-g${gi}-${m.key}`]||""});
+          if(m.p1&&m.p2) ready.push({round:lbl,a:m.p1.name,b:m.p2.name,station:st[`p1-g${gi}-${m.key}`]||"",live:!!lv[`p1-g${gi}-${m.key}`]});
           else if(m.p1||m.p2) upcoming.push({round:lbl,a:m.p1?m.p1.name:"?",b:m.p2?m.p2.name:"?"});
         });
       });
@@ -4082,7 +4145,7 @@ function regieMatchesFor(game){
         if(r.allDone&&r.groupWinner&&r.groupWinner!=="TIE")done++;
         r.matches.forEach(m=>{
           if(m.winner)return;
-          if(m.p1&&m.p2) ready.push({round:`Poule ${gi+1}`,a:m.p1.name,b:m.p2.name,station:st[`p2-g${gi}-${m.key}`]||""});
+          if(m.p1&&m.p2) ready.push({round:`Poule ${gi+1}`,a:m.p1.name,b:m.p2.name,station:st[`p2-g${gi}-${m.key}`]||"",live:!!lv[`p2-g${gi}-${m.key}`]});
         });
       });
       phaseInfo=`Phase 2/3 · Round-robin · ${done}/${(bk.groups2||[]).length} poules terminées`;
@@ -4090,7 +4153,7 @@ function regieMatchesFor(game){
       const res=resolve(bk.phase3);
       (res.groups||[]).forEach(grp=>(grp.columns||[]).forEach(col=>(col.matches||[]).forEach(m=>{
         if(m.winner)return;
-        if(m.p1&&m.p2) ready.push({round:col.title,a:m.p1.name,b:m.p2.name,station:st["p3-"+m.key]||""});
+        if(m.p1&&m.p2) ready.push({round:col.title,a:m.p1.name,b:m.p2.name,station:st["p3-"+m.key]||"",live:!!lv["p3-"+m.key]});
         else if(m.p1||m.p2) upcoming.push({round:col.title,a:m.p1?m.p1.name:"?",b:m.p2?m.p2.name:"?"});
       })));
       phaseInfo="Phase 3/3 · Tableau final";
@@ -4101,12 +4164,12 @@ function regieMatchesFor(game){
   }
   // ===== Course : manches jouables (≥2 joueurs, non décidées) + à venir
   if(bk.type==="race"){
-    const res=resolveRace(bk), ready=[], upcoming=[], st=bk.stations||{};
+    const res=resolveRace(bk), ready=[], upcoming=[], st=bk.stations||{}, lv=bk.live||{};
     let totalHeats=0, decided=0;
     res.columns.forEach(col=>col.heats.forEach(ht=>{
       totalHeats++; if(ht.st.decided) decided++;
       if(ht.st.decided) return;
-      if(ht.players.length>=2) ready.push({round:col.title, players:ht.players.map(p=>p.name), station:st[ht.key]||""});
+      if(ht.players.length>=2) ready.push({round:col.title, players:ht.players.map(p=>p.name), station:st[ht.key]||"", live:!!lv[ht.key]});
       else if(ht.players.length===1) upcoming.push({round:col.title, players:ht.players.map(p=>p.name)});
     }));
     const phaseInfo=`🏁 Course · ${decided}/${totalHeats} manche${totalHeats>1?"s":""} terminée${decided>1?"s":""}`;
@@ -4116,12 +4179,12 @@ function regieMatchesFor(game){
   // ===== formats classiques
   const res=resolve(bk);
   const ready=[], upcoming=[];
-  const st=bk.stations||{};
+  const st=bk.stations||{}, lv=bk.live||{};
   (res.groups||[]).forEach(grp=>{
     (grp.columns||[]).forEach(col=>{
       (col.matches||[]).forEach(m=>{
         if(m.winner) return;
-        if(m.p1 && m.p2){ ready.push({round:col.title, a:m.p1.name, b:m.p2.name, station:st[m.key]||""}); }
+        if(m.p1 && m.p2){ ready.push({round:col.title, a:m.p1.name, b:m.p2.name, station:st[m.key]||"", live:!!lv[m.key]}); }
         else if(m.p1 || m.p2){ upcoming.push({round:col.title, a:m.p1?m.p1.name:"?", b:m.p2?m.p2.name:"?"}); }
       });
     });
