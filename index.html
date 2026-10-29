@@ -808,9 +808,10 @@ async function boot(){
         let snap=null;
         try{ snap=await getDoc(doc(db,"roles",user.uid)); }catch(e){}
         if(snap && snap.exists()){
-          // ----- session STAFF (comportement historique)
-          playerUser=null; playerProfile=null; myRegs=[];
+          // ----- session STAFF (qui peut AUSSI avoir un profil joueur : orga-joueur)
+          playerUser=user;
           isAdmin=true;
+          await loadPlayerProfile();
           userRole = snap.data().role==="admin" ? "admin" : "mod";
           $("#adminLogin").classList.add("hidden");
           const roleLabel = userRole==="admin" ? "👑 Administrateur" : "🛡 Modérateur";
@@ -1326,9 +1327,10 @@ function renderRegDocs(){
 function renderRegIdentity(){
   const idBlock=$("#regIdentity"), banner=$("#regLoggedBanner");
   if(!idBlock||!banner) return;
-  const logged=!!(playerProfile && !DEMO && !isAdmin);
+  const logged=!!(playerProfile && !DEMO);
   idBlock.style.display=logged?"none":"";
-  const acc=$("#regAccountFields"); if(acc) acc.style.display=DEMO?"none":"";
+  // mot de passe : inutile en démo ET pour le staff (son compte existe déjà)
+  const acc=$("#regAccountFields"); if(acc) acc.style.display=(DEMO||isAdmin)?"none":"";
   banner.innerHTML=logged
     ? `<div class="notice" style="border-left-color:var(--ok);margin-bottom:10px">🎮 Tu t'inscris en tant que <b style="color:var(--jaune)">${esc(playerProfile.pseudo||"")}</b> <span class="sub" style="font-size:11px">(${esc(playerProfile.email||"")})</span> — tes informations de profil seront utilisées. <a onclick="go('moi')" style="cursor:pointer;color:var(--cyan);text-decoration:underline dotted">Modifier mon profil</a></div>`
     : "";
@@ -1392,8 +1394,11 @@ async function handleRegister(e){
   if(!f.querySelector('input[name=consent]')?.checked) return toast("Merci de cocher la case de consentement pour t'inscrire.",true);
   if(!f.querySelector('input[name=consentImage]')?.checked) return toast("Merci d'accepter les conditions relatives au droit à l'image pour t'inscrire.",true);
   const targetEvent = evPubId();
-  if(isAdmin && !DEMO) return toast("Tu es connecté avec un compte staff : ajoute le joueur depuis l'admin (« + Ajouter un joueur »), ou déconnecte-toi pour t'inscrire comme joueur.",true);
-  const logged = !!(playerProfile && !DEMO && !isAdmin);
+  const logged = !!(playerProfile && !DEMO);
+  // staff sans profil joueur : cette inscription crée SON profil (pas celui d'un tiers)
+  if(isAdmin && !DEMO && !logged){
+    if(!confirm("Tu es connecté avec un compte STAFF : cette inscription créera TON profil joueur sur ce compte.\nPour inscrire quelqu'un d'autre, utilise « + Ajouter un joueur » dans l'admin.\n\nContinuer avec ta propre inscription ?")) return;
+  }
 
   // ----- identité : depuis le profil (connecté) ou depuis le formulaire
   let pseudo,prenom,nom,ville,emailRaw,tel,birth,password="";
@@ -1410,7 +1415,7 @@ async function handleRegister(e){
     if(!pseudo) return toast("Indique ton pseudo / gamertag.",true);
     if(!prenom||!nom||!birth||!ville||!emailRaw||!tel) return toast("Remplis tous les champs obligatoires.",true);
     if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailRaw)) return toast("E-mail invalide.",true);
-    if(!DEMO){
+    if(!DEMO && !isAdmin){ // le staff garde son compte existant : pas de mot de passe à créer
       if((password||"").length<6) return toast("Choisis un mot de passe d'au moins 6 caractères.",true);
       if(password!==(fd.get("password2")||"")) return toast("Les deux mots de passe ne correspondent pas.",true);
     }
@@ -1439,7 +1444,9 @@ async function handleRegister(e){
     let uid = logged ? playerUser.uid : null;
     // ----- création du COMPTE joueur (première inscription)
     if(!logged && !DEMO){
-      try{
+      if(isAdmin){
+        uid=auth.currentUser.uid; // staff : profil joueur créé sur son compte existant
+      } else try{
         const cred=await createUserWithEmailAndPassword(auth,emailRaw,password);
         uid=cred.user.uid;
       }catch(err){
@@ -1537,10 +1544,11 @@ function renderProfileView(){
       <p class="sub">Mode démo : retrouve ta fiche avec ton code personnel.</p></div>`+legacyLookupHTML(true);
     return;
   }
-  // ----- staff connecté : cet onglet ne le concerne pas
-  if(isAdmin){
+  // ----- staff SANS profil joueur : il peut s'en créer un en s'inscrivant
+  if(isAdmin && !playerProfile){
     root.innerHTML=`<div class="panel corner"><h2>Mon profil</h2>
-      <p class="sub">Tu es connecté avec un compte <b>staff</b> — cet espace est celui des joueurs. Gère le tournoi depuis l'onglet Admin.</p></div>`+legacyLookupHTML(false);
+      <p class="sub">Tu es connecté avec un compte <b>staff</b>. Tu peux aussi jouer : inscris-toi à un tournoi via la page « S'inscrire » — ton <b>profil joueur</b> se créera sur ce même compte (sans nouveau mot de passe).</p>
+      <button class="btn sm" onclick="go('inscription')">S'inscrire à un tournoi ▸</button></div>`+legacyLookupHTML(false);
     return;
   }
   // ----- visiteur non connecté : connexion
@@ -1590,7 +1598,7 @@ function renderProfileView(){
         <label style="position:absolute;bottom:-4px;right:-4px;background:var(--jaune);color:#3a2e00;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px" title="Changer d'avatar">📷<input type="file" accept="image/*" style="display:none" onchange="myAvatarPick(this)"></label>
       </div>
       <div>
-        <h2 style="margin:0;color:var(--jaune)">${esc(p.pseudo||"Joueur")}</h2>
+        <h2 style="margin:0;color:var(--jaune)">${esc(p.pseudo||"Joueur")}${isAdmin?' <span class="pill" style="font-size:10px;vertical-align:middle">'+(userRole==="admin"?"👑 staff admin":"🛡 staff")+'</span>':''}</h2>
         <div class="sub" style="margin:2px 0 0">${esc(p.prenom||"")} ${esc(p.nom||"")}${age!=null?` · ${age} ans`:""}</div>
         <div class="sub" style="font-size:11px;margin-top:2px">${esc(p.email||playerUser.email||"")}</div>
       </div>
