@@ -2622,25 +2622,69 @@ function bracketHTML(game,editable){
   // la géométrie (alignements verticaux + connecteurs) est calculée après injection
   // dans le DOM par layoutBracketTree(), sur la base des hauteurs réelles mesurées
   let html=`<div class="pill" style="margin-bottom:14px">${bk.type==="double"?"Double élimination":"Simple élimination"} · FT${bk.ft}${bk.ftFinal?(" · Finale FT"+bk.ftFinal):""} · ${bk.size} places</div>`;
+  // ----- repli d'affichage façon start.gg ----------------------------------
+  // Hors mode échange, les matchs « réglés à vide » (exemptions et branches
+  // mortes : issue définitive sans que les 2 joueurs soient présents) ne sont
+  // PAS dessinés : un exempté apparaît directement au tour suivant, comme sur
+  // start.gg. En mode échange on ré-affiche TOUT (les places libres du 1er
+  // tour servent de destinations). Les connecteurs restent exacts grâce à
+  // data-feeders (indices dans la colonne précédente RENDUE), lu en priorité
+  // par layoutBracketTree()/drawBracketLinks().
+  const collapse=!swapMode;
   res.groups.forEach(g=>{
+    const vis=g.columns.map(col=>col.matches.map(m=> collapse ? !(m.settled && !(m.p1 && m.p2)) : true));
+    const rIdx=g.columns.map((col,ci)=>{ let k=0; return col.matches.map((m,mi)=>vis[ci][mi]?k++:null); });
+    const colShown=vis.map(v=>v.some(x=>x));
+    // feeders d'ORIGINE d'un match : ratio exact du moteur de résolution
+    // (2:1 pour les tours WB et LB majeurs, 1:1 pour les tours LB mineurs)
+    const origFeeders=(ci,mi)=>{
+      if(ci===0) return [];
+      const prevN=g.columns[ci-1].matches.length, n=g.columns[ci].matches.length;
+      const grp=(n>0 && prevN%n===0)?prevN/n:1;
+      const out=[]; for(let j=0;j<grp;j++){ const idx=mi*grp+j; if(idx<prevN) out.push(idx); }
+      return out;
+    };
+    // ancêtres VISIBLES de (ci,mi) dans la colonne d'origine tci : descend à
+    // travers les colonnes entièrement masquées (toutes celles entre la
+    // dernière colonne rendue et ci le sont par construction)
+    const visFeeders=(ci,mi,tci)=>{
+      const out=[];
+      origFeeders(ci,mi).forEach(f=>{
+        if(ci-1===tci){ if(vis[ci-1][f]) out.push(f); }
+        else if(ci-1>tci && !vis[ci-1][f]) out.push(...visFeeders(ci-1,f,tci));
+      });
+      return out;
+    };
+    if(collapse && !colShown.some(x=>x)) return; // groupe sans aucun match à montrer
     if(g.label) html+=`<div class="bracket-group-label">${g.label}</div>`;
     html+='<div class="bracket-scroll"><div class="bracket">';
-    g.columns.forEach(col=>{
+    let prevOrig=null; // index d'ORIGINE de la dernière colonne réellement rendue
+    g.columns.forEach((col,ci)=>{
+      if(collapse && !colShown[ci]) return; // colonne sans match visible : sautée
       html+=`<div class="round">`;
       html+=`<div class="round-title">${col.title}</div>`;
-      col.matches.forEach(m=>{
+      col.matches.forEach((m,mi)=>{
+        if(collapse && !vis[ci][mi]) return; // exemption / branche morte : masquée
+        // routage explicite des connecteurs vers la colonne précédente rendue ;
+        // "-" = aucun lien entrant (joueur issu d'exemptions, comme start.gg)
+        let fd="";
+        if(collapse && prevOrig!=null){
+          const fl=visFeeders(ci,mi,prevOrig).map(f=>rIdx[prevOrig][f]);
+          fd=' data-feeders="'+(fl.length?fl.join(","):"-")+'"';
+        }
         const ftTag=(m.p1&&m.p2)?`<span class="ft-tag">FT${ftFor(bk,m.key)}</span>`:"";
         // numéro de poste/table : saisie pour admin+mod (matchs jouables), étiquette en lecture sinon
         const stv=((bk.stations||{})[m.key]||"");
-        const ghost=!m.p1 && !m.p2 && !swapMode; // branche morte (2 exemptions) : discrète hors mode échange
+        const ghost=!m.p1 && !m.p2 && m.settled && !swapMode; // branche morte si jamais rendue (repli désactivé)
         const isLive=!!((bk.live||{})[m.key]) && m.p1 && m.p2 && !m.winner;
         const station = (editable && m.p1 && m.p2 && !m.winner)
           ? `<div class="station-edit">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','${m.key}',this.value)">${liveBtnHTML(game,m.key,bk)}</div>`
           : (stv && !m.winner ? `<div class="station-tag">🖥 Poste ${esc(stv)}</div>` : "");
         const liveTag=isLive?'<span class="live-tag">🔴 EN COURS</span>':'';
-        html+='<div class="match'+(isLive?' live':'')+(ghost?' ghost':'')+'" data-mkey="'+esc(m.key)+'">'+liveTag+ftTag+slotHTML(game,m,"p1",editable)+slotHTML(game,m,"p2",editable)+station+'</div>';
+        html+='<div class="match'+(isLive?' live':'')+(ghost?' ghost':'')+'"'+fd+' data-mkey="'+esc(m.key)+'">'+liveTag+ftTag+slotHTML(game,m,"p1",editable)+slotHTML(game,m,"p2",editable)+station+'</div>';
       });
       html+='</div>';
+      prevOrig=ci;
     });
     html+='</div></div>';
   });
