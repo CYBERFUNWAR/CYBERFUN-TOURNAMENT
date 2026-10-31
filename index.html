@@ -3335,8 +3335,15 @@ async function doAddLate(i){
     }
     target=best!=null?best:free[0];
   } else {
-    // en priorité : place libre dont le voisin de match est occupé (exemption → vrai match)
-    target=free.find(idx=>slots[idx^1]) ?? free[0];
+    // Logique start.gg : le retardataire prend le DERNIER seed. On choisit donc
+    // la place libre au seed le plus petit (= la prochaine dans l'ordre de
+    // seeding), ce qui le fait affronter l'exempté « dernier de la liste » et
+    // garantit que le vainqueur de ce préliminaire retombe sur un exempté au
+    // tour suivant — jamais sur le vainqueur d'un autre préliminaire.
+    const order=seedOrder(bk.size);
+    const facing=free.filter(idx=>slots[idx^1]);          // crée un vrai match
+    const pool=facing.length?facing:free;                  // sinon : n'importe quelle place libre
+    target=pool.reduce((a,b)=>order[a]<=order[b]?a:b);
   }
   slots[target]={id:r.id,name:displayName(r)};
   try{
