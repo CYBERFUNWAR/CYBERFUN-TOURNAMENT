@@ -468,6 +468,7 @@
             <button class="btn sm admin-only" onclick="genBracket()">⚙ Générer</button>
             <button class="btn ghost sm admin-only" onclick="shuffleBracket()">🔀 Mélanger</button>
             <button class="btn ghost sm admin-only" id="swapBtn" onclick="toggleSwap()">↔ Échanger</button>
+            <button class="btn ghost sm admin-only" onclick="addLatePlayer()" title="Intégrer un inscrit de dernière minute dans le bracket déjà généré, sur une place libre du 1er tour">➕ Retardataire</button>
             <button class="btn ghost sm admin-only" onclick="exportBracketPDF($('#brkGame').value)">⬇ PDF</button>
             <button class="btn ghost sm admin-only" onclick="exportPodiumImage($('#brkGame').value)">🖼 Podium</button>
             <button class="btn ghost sm admin-only" id="visBtn" onclick="toggleBracketVisibility()">👁 Public</button>
@@ -2653,11 +2654,12 @@ function slotHTML(game,m,which,editable){
   const sc=which==="p1"?m.score.a:m.score.b;
   const active=editable&&p&&other;
   const scoreCell=(p&&other)?`<span class="score">${sc}</span>`:"";
-  // mode swap : on rend les slots cliquables (admin uniquement, slot avec joueur)
-  if(editable && swapMode && p){
+  // mode swap : slots cliquables (joueurs partout au 1er tour, Y COMPRIS les places
+  // libres — pour déplacer quelqu'un sur une exemption ou libérer sa place)
+  if(editable && swapMode && (p || m.key.startsWith("wb-0-"))){
     cls+=" swap-pick";
     if(swapPick && swapPick.key===m.key && swapPick.which===which) cls+=" swap-selected";
-    return `<div class="${cls}" onclick="pickSwap('${m.key}','${which}')"><span class="nm">${esc(p.name)}</span></div>`;
+    return `<div class="${cls}" onclick="pickSwap('${m.key}','${which}')"><span class="nm">${p?esc(p.name):"🡐 Place libre"}</span></div>`;
   }
   const isFF=ffSide(game,m.key)===which;
   const scoreCellFF=(p&&other)?`<span class="score"${isFF?' style="color:var(--danger)"':''}>${isFF?"F":sc}</span>`:"";
@@ -3066,14 +3068,14 @@ function toggleSwap(){
   swapMode=!swapMode; swapPick=null;
   $("#swapBtn").style.background = swapMode ? "linear-gradient(180deg,var(--jaune-2),var(--jaune))" : "";
   $("#swapBtn").style.color = swapMode ? "#1a0b2e" : "";
-  if(swapMode) toast("Mode échange ON : clique sur un joueur, puis sur un autre.");
+  if(swapMode) toast("Mode échange ON : clique sur un joueur, puis sur sa destination (autre joueur OU place libre du 1er tour).");
   renderAdminBracket();
 }
 async function pickSwap(key,which){
   const game=$("#brkGame").value; const bk=getBk(game); if(!bk) return;
   // les positions des joueurs ne sont éditables qu'au 1er round (wb-0-*)
   // car les rounds suivants sont déterminés par les vainqueurs
-  if(!key.startsWith("wb-0-")){ toast("Échange possible uniquement au 1er tour.",true); return; }
+  if(!key.startsWith("wb-0-")){ toast("Les tours suivants se déduisent des résultats : déplace le joueur via sa case du 1er TOUR (y compris les places libres).",true); return; }
   const mi=parseInt(key.split("-")[2],10);
   const slotIdx = which==="p1" ? 2*mi : 2*mi+1;
   if(!swapPick){ swapPick={key,which,slotIdx}; renderAdminBracket(); return; }
@@ -3085,6 +3087,61 @@ async function pickSwap(key,which){
   await saveBracket(game,{...bk,slots:newSlots,scores:{}});
   toast("Joueurs échangés ✓");
 }
+
+/* ---------- intégrer un retardataire dans un bracket DÉJÀ généré ----------
+   Place un inscrit absent de l'arbre sur une place libre du 1er tour, sans tout
+   régénérer (les inscrits et scores existants ne bougent pas) :
+   - classique : en priorité une place libre FACE À un joueur (transforme une
+     exemption en vrai match) ; sinon n'importe quelle place libre.
+   - course : la manche la moins remplie.
+   Ensuite, « ↔ Échanger » permet de le repositionner à la main si besoin. */
+let _lateCtx=null;
+function addLatePlayer(){
+  if(!requireAdmin())return;
+  const game=$("#brkGame").value; const bk=game?getBk(game):null;
+  if(!bk) return toast("Génère d'abord un bracket.",true);
+  if(bk.type==="capcom") return toast("Format Capcom : effectif fixe de 48 — régénère si la liste change.",true);
+  const inBk=new Set((bk.slots||[]).filter(Boolean).map(p=>p.id));
+  const missing=evReg().filter(r=>r.games.includes(game) && !inBk.has(r.id));
+  if(!missing.length) return toast("Tous les inscrits à "+game+" sont déjà dans le bracket.",true);
+  const free=(bk.slots||[]).map((p,i)=>p?null:i).filter(i=>i!=null);
+  if(!free.length) return toast("Aucune place libre dans l'arbre ("+bk.slots.length+" places occupées) — il faudra régénérer en taille supérieure.",true);
+  _lateCtx={game};
+  const rows=missing.map((r,i)=>`<button class="btn ghost sm" style="display:block;width:100%;text-align:left;margin-top:8px" onclick="doAddLate(${i})">🎮 ${esc(displayName(r))}${r.prenom?` <span class="sub" style="font-size:11px">(${esc(r.prenom)} ${esc(r.nom||"")})</span>`:""}</button>`).join("");
+  _lateCtx.missing=missing;
+  openModal("➕ Intégrer un retardataire — "+esc(game),
+    `<p class="sub" style="font-size:12px">${free.length} place${free.length>1?"s":""} libre${free.length>1?"s":""} au 1er tour. Choisis le joueur à intégrer :</p>`+rows);
+}
+async function doAddLate(i){
+  const ctx=_lateCtx; if(!ctx) return;
+  const game=ctx.game, bk=getBk(game); if(!bk) return;
+  const r=ctx.missing[i]; if(!r) return;
+  if(bracketHasScores(bk) && !confirm("Des scores sont déjà saisis dans cet arbre.\nLe joueur sera placé sur une place libre du 1er tour — vérifie que l'adversaire concerné n'a pas déjà joué son match suivant.\n\nContinuer ?")) return;
+  const slots=bk.slots.slice();
+  const free=slots.map((p,idx)=>p?null:idx).filter(idx=>idx!=null);
+  if(!free.length){ closeModal(); return toast("Plus de place libre.",true); }
+  let target;
+  if(bk.type==="race"){
+    // manche la moins remplie
+    const P=bk.P, heats=bk.heatsR0; let best=null, bestN=Infinity;
+    for(let h=0;h<heats;h++){
+      const filled=slots.slice(h*P,h*P+P).filter(Boolean).length;
+      const firstFree=free.find(idx=>idx>=h*P && idx<h*P+P);
+      if(firstFree!=null && filled<bestN){ bestN=filled; best=firstFree; }
+    }
+    target=best!=null?best:free[0];
+  } else {
+    // en priorité : place libre dont le voisin de match est occupé (exemption → vrai match)
+    target=free.find(idx=>slots[idx^1]) ?? free[0];
+  }
+  slots[target]={id:r.id,name:displayName(r)};
+  try{
+    await saveBracket(game,{...bk,slots});
+    closeModal(); _lateCtx=null;
+    toast(displayName(r)+" intégré au bracket (1er tour) ✓ — utilise « ↔ Échanger » pour le déplacer si besoin.");
+  }catch(e){ console.error(e); toast("Erreur d'enregistrement.",true); }
+}
+window.addLatePlayer=addLatePlayer; window.doAddLate=doAddLate;
 
 /* ---------- export PDF ---------- */
 async function exportBracketPDF(game){
