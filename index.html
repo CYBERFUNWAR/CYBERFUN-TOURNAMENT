@@ -2623,18 +2623,29 @@ function bracketHTML(game,editable){
   // dans le DOM par layoutBracketTree(), sur la base des hauteurs réelles mesurées
   let html=`<div class="pill" style="margin-bottom:14px">${bk.type==="double"?"Double élimination":"Simple élimination"} · FT${bk.ft}${bk.ftFinal?(" · Finale FT"+bk.ftFinal):""} · ${bk.size} places</div>`;
   // ----- repli d'affichage façon start.gg ----------------------------------
-  // Hors mode échange, les matchs « réglés à vide » (exemptions et branches
-  // mortes : issue définitive sans que les 2 joueurs soient présents) ne sont
-  // PAS dessinés : un exempté apparaît directement au tour suivant, comme sur
-  // start.gg. En mode échange on ré-affiche TOUT (les places libres du 1er
-  // tour servent de destinations). Les connecteurs restent exacts grâce à
-  // data-feeders (indices dans la colonne précédente RENDUE), lu en priorité
-  // par layoutBracketTree()/drawBracketLinks().
+  // Hors mode échange, la visibilité d'un match est STRUCTURELLE, jamais liée
+  // aux résultats : un match n'est dessiné que si ses DEUX côtés peuvent un
+  // jour être occupés. On le détermine en résolvant l'arbre avec des scores
+  // fictifs (chaque match potentiel produit vainqueur ET perdant, mêmes clés,
+  // même routage LB). Ainsi l'affichage ne bouge JAMAIS au fil des saisies :
+  // les exemptions — du 1er tour OU en cours de route — ne sont pas dessinées,
+  // et un joueur est relié directement à son prochain VRAI match, même à
+  // plusieurs colonnes de là (data-feeders "col:idx", lu par le moteur de
+  // layout). En mode échange on ré-affiche TOUT (places libres = destinations).
   const collapse=!swapMode;
+  let visKey=null;
+  if(collapse){
+    const probe={type:bk.type,size:bk.size,ft:1,ftFinal:0,lbCross:bk.lbCross,slots:bk.slots,
+      scores:new Proxy({},{get:()=>({a:1,b:0})})};
+    visKey={};
+    resolve(probe).groups.forEach(pg=>pg.columns.forEach(pc=>pc.matches.forEach(pm=>{ visKey[pm.key]=!!(pm.p1&&pm.p2); })));
+  }
   res.groups.forEach(g=>{
-    const vis=g.columns.map(col=>col.matches.map(m=> collapse ? !(m.settled && !(m.p1 && m.p2)) : true));
+    // clé absente de la sonde (ex. reset de grande finale gf-1) : visible
+    const vis=g.columns.map(col=>col.matches.map(m=> collapse ? visKey[m.key]!==false : true));
     const rIdx=g.columns.map((col,ci)=>{ let k=0; return col.matches.map((m,mi)=>vis[ci][mi]?k++:null); });
     const colShown=vis.map(v=>v.some(x=>x));
+    let rcc=0; const rCol=g.columns.map((c,ci)=>colShown[ci]?rcc++:null); // index de colonne RENDUE
     // feeders d'ORIGINE d'un match : ratio exact du moteur de résolution
     // (2:1 pour les tours WB et LB majeurs, 1:1 pour les tours LB mineurs)
     const origFeeders=(ci,mi)=>{
@@ -2644,32 +2655,30 @@ function bracketHTML(game,editable){
       const out=[]; for(let j=0;j<grp;j++){ const idx=mi*grp+j; if(idx<prevN) out.push(idx); }
       return out;
     };
-    // ancêtres VISIBLES de (ci,mi) dans la colonne d'origine tci : descend à
-    // travers les colonnes entièrement masquées (toutes celles entre la
-    // dernière colonne rendue et ci le sont par construction)
-    const visFeeders=(ci,mi,tci)=>{
+    // ancêtres VISIBLES de (ci,mi) : descend à travers les matchs masqués, sur
+    // autant de colonnes que nécessaire ; renvoie des paires [colonne, index]
+    const visFeeders=(ci,mi)=>{
       const out=[];
       origFeeders(ci,mi).forEach(f=>{
-        if(ci-1===tci){ if(vis[ci-1][f]) out.push(f); }
-        else if(ci-1>tci && !vis[ci-1][f]) out.push(...visFeeders(ci-1,f,tci));
+        if(vis[ci-1][f]) out.push([ci-1,f]);
+        else out.push(...visFeeders(ci-1,f));
       });
       return out;
     };
     if(collapse && !colShown.some(x=>x)) return; // groupe sans aucun match à montrer
     if(g.label) html+=`<div class="bracket-group-label">${g.label}</div>`;
     html+='<div class="bracket-scroll"><div class="bracket">';
-    let prevOrig=null; // index d'ORIGINE de la dernière colonne réellement rendue
     g.columns.forEach((col,ci)=>{
       if(collapse && !colShown[ci]) return; // colonne sans match visible : sautée
       html+=`<div class="round">`;
       html+=`<div class="round-title">${col.title}</div>`;
       col.matches.forEach((m,mi)=>{
         if(collapse && !vis[ci][mi]) return; // exemption / branche morte : masquée
-        // routage explicite des connecteurs vers la colonne précédente rendue ;
+        // routage explicite des connecteurs ("col rendue:idx rendu") ;
         // "-" = aucun lien entrant (joueur issu d'exemptions, comme start.gg)
         let fd="";
-        if(collapse && prevOrig!=null){
-          const fl=visFeeders(ci,mi,prevOrig).map(f=>rIdx[prevOrig][f]);
+        if(collapse && rCol[ci]>0){
+          const fl=visFeeders(ci,mi).map(([c,f])=>rCol[c]+":"+rIdx[c][f]);
           fd=' data-feeders="'+(fl.length?fl.join(","):"-")+'"';
         }
         const ftTag=(m.p1&&m.p2)?`<span class="ft-tag">FT${ftFor(bk,m.key)}</span>`:"";
@@ -2684,7 +2693,6 @@ function bracketHTML(game,editable){
         html+='<div class="match'+(isLive?' live':'')+(ghost?' ghost':'')+'"'+fd+' data-mkey="'+esc(m.key)+'">'+liveTag+ftTag+slotHTML(game,m,"p1",editable)+slotHTML(game,m,"p2",editable)+station+'</div>';
       });
       html+='</div>';
-      prevOrig=ci;
     });
     html+='</div></div>';
   });
@@ -3683,9 +3691,18 @@ function layoutBracketTree(bk){
     const prevN=cols[ci-1].matches.length, n=c.matches.length;
     c.matches.forEach((m,i)=>{
       const attr=m.getAttribute&&m.getAttribute("data-feeders");
-      if(attr!=null && attr!==""){ c.feeders[i]=attr.split(",").map(x=>parseInt(x,10)).filter(x=>!isNaN(x)); return; }
+      if(attr!=null && attr!==""){
+        // entrées "idx" (colonne précédente) ou "col:idx" (colonne quelconque :
+        // liaisons qui enjambent des tours masqués par le repli start.gg)
+        c.feeders[i]=attr.split(",").map(x=>{
+          const p=x.split(":");
+          if(p.length===2){ const cc=parseInt(p[0],10), ii=parseInt(p[1],10); return (isNaN(cc)||isNaN(ii))?null:[cc,ii]; }
+          const v=parseInt(x,10); return isNaN(v)?null:[ci-1,v];
+        }).filter(Boolean);
+        return;
+      }
       const grp = (n>0 && prevN%n===0) ? prevN/n : Math.max(1,Math.round(prevN/n));
-      const list=[]; for(let j=0;j<grp;j++){ const idx=i*grp+j; if(idx<prevN) list.push(idx); }
+      const list=[]; for(let j=0;j<grp;j++){ const idx=i*grp+j; if(idx<prevN) list.push([ci-1,idx]); }
       c.feeders[i]=list.length?list:null;
     });
   });
@@ -3699,7 +3716,7 @@ function layoutBracketTree(bk){
       const f=ci>0?c.feeders[i]:null;
       if(f && f.length){
         // centre = moyenne des centres des manches sources
-        let sum=0,cnt=0; f.forEach(idx=>{ if(CTR[ci-1][idx]!=null){ sum+=CTR[ci-1][idx]; cnt++; } });
+        let sum=0,cnt=0; f.forEach(([fc,fi])=>{ if(CTR[fc]&&CTR[fc][fi]!=null){ sum+=CTR[fc][fi]; cnt++; } });
         top=(cnt?sum/cnt:cursor)-H[ci][i]/2;
       }else{
         top=cursor;
@@ -3747,8 +3764,8 @@ function drawBracketLinks(bk,cols){
     c.matches.forEach((m,i)=>{
       const f=c.feeders[i]; if(!f||!f.length) return;
       const tr=rectOf(m);
-      f.forEach(idx=>{
-        const src=cols[ci-1].matches[idx]; if(!src) return;
+      f.forEach(([fc,fi])=>{
+        const src=cols[fc]&&cols[fc].matches[fi]; if(!src) return;
         const fr=rectOf(src), midX=(fr.r+tr.l)/2;
         d+="M"+fr.r.toFixed(1)+" "+fr.c.toFixed(1)+"H"+midX.toFixed(1)+"V"+tr.c.toFixed(1)+"H"+tr.l.toFixed(1);
       });
