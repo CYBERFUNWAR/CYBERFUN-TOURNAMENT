@@ -191,6 +191,7 @@
   .live-btn{border:1px solid var(--line);background:rgba(10,6,18,.5);color:var(--muted);border-radius:7px;font-size:13px;line-height:24px;padding:0 9px;cursor:pointer;touch-action:manipulation}
   .live-btn.on{background:rgba(255,77,109,.2);border-color:#ff4d6d;color:#ff4d6d;box-shadow:0 0 8px rgba(255,77,109,.5)}
   .match.live{border-color:#ff4d6d!important;box-shadow:0 0 14px rgba(255,77,109,.35)}
+  .match.ghost{opacity:.3} /* match sans aucun joueur (double exemption) : présent mais discret */
   .live-tag{position:absolute;top:-10px;left:8px;z-index:3;background:#2a0a14;border:1px solid #ff4d6d;color:#ff4d6d;border-radius:6px;font-size:9px;letter-spacing:1px;padding:1px 6px;font-weight:700}
   .station-edit input{width:44px;font-size:12px;border:none;background:transparent;color:var(--cyan);text-align:center;outline:none;padding:0}
   /* variante inline du poste, pour les cartes de groupes/poules Capcom */
@@ -2630,12 +2631,13 @@ function bracketHTML(game,editable){
         const ftTag=(m.p1&&m.p2)?`<span class="ft-tag">FT${ftFor(bk,m.key)}</span>`:"";
         // numéro de poste/table : saisie pour admin+mod (matchs jouables), étiquette en lecture sinon
         const stv=((bk.stations||{})[m.key]||"");
+        const ghost=!m.p1 && !m.p2 && !swapMode; // branche morte (2 exemptions) : discrète hors mode échange
         const isLive=!!((bk.live||{})[m.key]) && m.p1 && m.p2 && !m.winner;
         const station = (editable && m.p1 && m.p2 && !m.winner)
           ? `<div class="station-edit">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','${m.key}',this.value)">${liveBtnHTML(game,m.key,bk)}</div>`
           : (stv && !m.winner ? `<div class="station-tag">🖥 Poste ${esc(stv)}</div>` : "");
         const liveTag=isLive?'<span class="live-tag">🔴 EN COURS</span>':'';
-        html+='<div class="match'+(isLive?' live':'')+'" data-mkey="'+esc(m.key)+'">'+liveTag+ftTag+slotHTML(game,m,"p1",editable)+slotHTML(game,m,"p2",editable)+station+'</div>';
+        html+='<div class="match'+(isLive?' live':'')+(ghost?' ghost':'')+'" data-mkey="'+esc(m.key)+'">'+liveTag+ftTag+slotHTML(game,m,"p1",editable)+slotHTML(game,m,"p2",editable)+station+'</div>';
       });
       html+='</div>';
     });
@@ -3068,16 +3070,29 @@ function toggleSwap(){
   swapMode=!swapMode; swapPick=null;
   $("#swapBtn").style.background = swapMode ? "linear-gradient(180deg,var(--jaune-2),var(--jaune))" : "";
   $("#swapBtn").style.color = swapMode ? "#1a0b2e" : "";
-  if(swapMode) toast("Mode échange ON : clique sur un joueur, puis sur sa destination (autre joueur OU place libre du 1er tour).");
+  if(swapMode) toast("Mode échange ON : clique sur un joueur (dans n'importe quel tour), puis sur sa destination (autre joueur, ou place libre du 1er tour).");
   renderAdminBracket();
 }
 async function pickSwap(key,which){
   const game=$("#brkGame").value; const bk=getBk(game); if(!bk) return;
-  // les positions des joueurs ne sont éditables qu'au 1er round (wb-0-*)
-  // car les rounds suivants sont déterminés par les vainqueurs
-  if(!key.startsWith("wb-0-")){ toast("Les tours suivants se déduisent des résultats : déplace le joueur via sa case du 1er TOUR (y compris les places libres).",true); return; }
-  const mi=parseInt(key.split("-")[2],10);
-  const slotIdx = which==="p1" ? 2*mi : 2*mi+1;
+  // Les positions réelles vivent au 1er tour (bk.slots). Avant tout score, un joueur
+  // affiché dans un tour SUIVANT y est arrivé par exemption : on retrouve sa case
+  // d'origine et on la manipule — comme sur start.gg, on peut donc le déplacer
+  // directement depuis le Tour 2, les quarts, etc.
+  let slotIdx;
+  if(key.startsWith("wb-0-")){
+    const mi=parseInt(key.split("-")[2],10);
+    slotIdx = which==="p1" ? 2*mi : 2*mi+1;
+  } else {
+    let pl=null;
+    const res=resolve(bk);
+    outer: for(const g of res.groups) for(const col of g.columns) for(const m of col.matches){
+      if(m.key===key){ pl=(which==="p1"?m.p1:m.p2); break outer; }
+    }
+    if(!pl){ toast("Case vide d'un tour suivant : choisis plutôt une « place libre » du 1er tour comme destination.",true); return; }
+    slotIdx=bk.slots.findIndex(x=>x&&x.id===pl.id);
+    if(slotIdx<0){ toast("Ce joueur ne peut pas être déplacé d'ici.",true); return; }
+  }
   if(!swapPick){ swapPick={key,which,slotIdx}; renderAdminBracket(); return; }
   if(swapPick.slotIdx===slotIdx){ swapPick=null; renderAdminBracket(); return; }
   // permuter dans bk.slots
