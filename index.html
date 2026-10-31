@@ -468,6 +468,7 @@
             </select>
             <button class="btn sm admin-only" onclick="genBracket()">⚙ Générer</button>
             <button class="btn ghost sm admin-only" onclick="shuffleBracket()">🔀 Mélanger</button>
+            <button class="btn ghost sm admin-only" onclick="editPlacement()" title="Réordonner la liste des joueurs : l'arbre se reconstruit proprement (exemptions bien réparties), comme le seeding de start.gg">🧩 Placement</button>
             <button class="btn ghost sm admin-only" id="swapBtn" onclick="toggleSwap()">↔ Échanger</button>
             <button class="btn ghost sm admin-only" onclick="addLatePlayer()" title="Intégrer un inscrit de dernière minute dans le bracket déjà généré, sur une place libre du 1er tour">➕ Retardataire</button>
             <button class="btn ghost sm admin-only" onclick="exportBracketPDF($('#brkGame').value)">⬇ PDF</button>
@@ -3103,6 +3104,83 @@ async function pickSwap(key,which){
   toast("Joueurs échangés ✓");
 }
 
+/* ---------- PLACEMENT par liste ordonnée (façon start.gg) ----------
+   Au lieu de déplacer des cases une à une : on réordonne la LISTE des joueurs
+   (1 = tête de série) et l'arbre est reconstruit par seedOrder. Garanties :
+   exemptions réparties sur les premiers de la liste, jamais deux places libres
+   face à face, structure standard. Utilisable tant qu'aucun score n'est saisi. */
+let _placeDraft=null;
+function editPlacement(){
+  if(!requireAdmin())return;
+  const game=$("#brkGame").value; const bk=game?getBk(game):null;
+  if(!bk) return toast("Génère d'abord un bracket.",true);
+  if(bk.type==="capcom"||bk.type==="race") return toast("Le placement par liste concerne les formats simple/double élimination.",true);
+  if(bracketHasScores(bk)) return toast("Impossible : des scores ont déjà été saisis.",true);
+  // reconstituer l'ordre de seed actuel depuis les cases (seed du slot i = order[i])
+  const order=seedOrder(bk.size);
+  const pairs=[]; bk.slots.forEach((p,i)=>{ if(p) pairs.push({seed:order[i],p}); });
+  pairs.sort((a,b)=>a.seed-b.seed);
+  _placeDraft={ game, size:bk.size, list:pairs.map(x=>x.p) };
+  renderPlacement();
+}
+function _placePreview(list,size){
+  const order=seedOrder(size), slots=new Array(size).fill(null);
+  order.forEach((seed,i)=>{ if(seed<=list.length) slots[i]=list[seed-1]; });
+  const duels=[], exempts=[];
+  for(let m=0;m<size/2;m++){
+    const a=slots[2*m], b=slots[2*m+1];
+    if(a&&b) duels.push([a,b]); else if(a||b) exempts.push(a||b);
+  }
+  return {duels,exempts};
+}
+function renderPlacement(){
+  const d=_placeDraft; if(!d) return;
+  const rows=d.list.map((p,i)=>`
+    <div class="hrow" style="background:rgba(10,6,18,.4)">
+      <span class="rk" style="min-width:26px">${i+1}</span>
+      <span class="pn">${esc(p.name)}</span>
+      <span style="display:flex;gap:6px">
+        <button class="btn ghost sm" style="padding:4px 12px" ${i===0?"disabled":""} onclick="placeMove(${i},-1)">▲</button>
+        <button class="btn ghost sm" style="padding:4px 12px" ${i===d.list.length-1?"disabled":""} onclick="placeMove(${i},1)">▼</button>
+      </span>
+    </div>`).join("");
+  const pv=_placePreview(d.list,d.size);
+  const duelsHTML=pv.duels.length
+    ? pv.duels.map(([a,b])=>`<span class="badge">${esc(a.name)} <b style="color:var(--jaune)">vs</b> ${esc(b.name)}</span>`).join(" ")
+    : '<span class="sub">aucun — tout le monde est exempté au 1er tour</span>';
+  const exHTML=pv.exempts.length
+    ? pv.exempts.map(p=>`<span class="badge" style="opacity:.65">${esc(p.name)}</span>`).join(" ")
+    : '<span class="sub">aucun</span>';
+  openModal("🧩 Placement — "+esc(d.game), `
+    <p class="sub" style="font-size:12px;margin-top:0">Réordonne la liste : <b>1 = tête de série</b>. Les premiers reçoivent les exemptions, les derniers s'affrontent au 1er tour (1 contre le dernier, 2 contre l'avant-dernier…). L'arbre est reconstruit proprement — jamais deux places libres face à face.</p>
+    <div style="max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px">${rows}</div>
+    <div style="margin-top:12px"><div class="sub" style="font-size:11px;margin-bottom:4px">⚔ Matchs du 1er tour :</div>${duelsHTML}</div>
+    <div style="margin-top:8px"><div class="sub" style="font-size:11px;margin-bottom:4px">⏭ Exemptés (entrent au tour suivant) :</div>${exHTML}</div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn sm" onclick="confirmPlacement()">✓ Appliquer ce placement</button>
+      <button class="btn ghost sm" onclick="closeModal();_placeDraft=null">Annuler</button>
+    </div>`);
+}
+function placeMove(i,dir){
+  const d=_placeDraft; if(!d) return;
+  const j=i+dir; if(j<0||j>=d.list.length) return;
+  [d.list[i],d.list[j]]=[d.list[j],d.list[i]];
+  renderPlacement();
+}
+async function confirmPlacement(){
+  const d=_placeDraft; if(!d) return;
+  const bk=getBk(d.game); if(!bk) return;
+  if(bracketHasScores(bk)) { closeModal(); return toast("Des scores ont été saisis entre-temps — placement annulé.",true); }
+  const order=seedOrder(d.size), slots=new Array(d.size).fill(null);
+  order.forEach((seed,i)=>{ if(seed<=d.list.length) slots[i]=d.list[seed-1]; });
+  try{
+    await saveBracket(d.game,{...bk,slots,scores:{}});
+    closeModal(); _placeDraft=null;
+    toast("Placement appliqué ✓ — arbre reconstruit.");
+  }catch(e){ console.error(e); toast("Erreur d'enregistrement.",true); }
+}
+window.editPlacement=editPlacement; window.placeMove=placeMove; window.confirmPlacement=confirmPlacement;
+
 /* ---------- intégrer un retardataire dans un bracket DÉJÀ généré ----------
    Place un inscrit absent de l'arbre sur une place libre du 1er tour, sans tout
    régénérer (les inscrits et scores existants ne bougent pas) :
@@ -3153,7 +3231,7 @@ async function doAddLate(i){
   try{
     await saveBracket(game,{...bk,slots});
     closeModal(); _lateCtx=null;
-    toast(displayName(r)+" intégré au bracket (1er tour) ✓ — utilise « ↔ Échanger » pour le déplacer si besoin.");
+    toast(displayName(r)+" intégré au bracket ✓ — « 🧩 Placement » pour réorganiser, « ↔ Échanger » pour une retouche.");
   }catch(e){ console.error(e); toast("Erreur d'enregistrement.",true); }
 }
 window.addLatePlayer=addLatePlayer; window.doAddLate=doAddLate;
