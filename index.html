@@ -2628,16 +2628,17 @@ function bracketHTML(game,editable){
   // dans le DOM par layoutBracketTree(), sur la base des hauteurs réelles mesurées
   let html=`<div class="pill" style="margin-bottom:14px">${bk.type==="double"?"Double élimination":"Simple élimination"} · FT${bk.ft}${bk.ftFinal?(" · Finale FT"+bk.ftFinal):""} · ${bk.size} places</div>`;
   // ----- repli d'affichage façon start.gg ----------------------------------
-  // Hors mode échange, la visibilité d'un match est STRUCTURELLE, jamais liée
-  // aux résultats : un match n'est dessiné que si ses DEUX côtés peuvent un
-  // jour être occupés. On le détermine en résolvant l'arbre avec des scores
-  // fictifs (chaque match potentiel produit vainqueur ET perdant, mêmes clés,
-  // même routage LB). Ainsi l'affichage ne bouge JAMAIS au fil des saisies :
-  // les exemptions — du 1er tour OU en cours de route — ne sont pas dessinées,
-  // et un joueur est relié directement à son prochain VRAI match, même à
-  // plusieurs colonnes de là (data-feeders "col:idx", lu par le moteur de
-  // layout). En mode échange on ré-affiche TOUT (places libres = destinations).
-  const collapse=!swapMode;
+  // La visibilité d'un match est STRUCTURELLE, jamais liée aux résultats : un
+  // match n'est dessiné que si ses DEUX côtés peuvent un jour être occupés. On
+  // le détermine en résolvant l'arbre avec des scores fictifs (chaque match
+  // potentiel produit vainqueur ET perdant, mêmes clés, même routage LB).
+  // Ainsi l'affichage ne bouge JAMAIS au fil des saisies : les exemptions — du
+  // 1er tour OU en cours de route — ne sont pas dessinées, et un joueur est
+  // relié directement à son prochain VRAI match, même à plusieurs colonnes de
+  // là (data-feeders "col:idx", lu par le moteur de layout). Le mode échange
+  // conserve EXACTEMENT la même vue (lettres comprises) : on y clique sur deux
+  // JOUEURS pour les permuter ; les restructurations passent par 🧩 Placement.
+  const collapse=true;
   let visKey=null, probePot=null, letters=null, matchByKey=null, sideLabel=null;
   if(collapse){
     const probe={type:bk.type,size:bk.size,ft:1,ftFinal:0,lbCross:bk.lbCross,slots:bk.slots,
@@ -2749,12 +2750,13 @@ function slotHTML(game,m,which,editable,srcLbl){
   const sc=which==="p1"?m.score.a:m.score.b;
   const active=editable&&p&&other;
   const scoreCell=(p&&other)?`<span class="score">${sc}</span>`:"";
-  // mode swap : slots cliquables (joueurs partout au 1er tour, Y COMPRIS les places
-  // libres — pour déplacer quelqu'un sur une exemption ou libérer sa place)
-  if(editable && swapMode && (p || m.key.startsWith("wb-0-"))){
+  // mode swap : on clique sur deux JOUEURS (où qu'ils soient affichés — Tour 1
+  // ou exemptés plus loin) pour permuter leurs places d'origine. La vue reste
+  // identique au bracket normal (repli + lettres), donc on garde ses repères.
+  if(editable && swapMode && p){
     cls+=" swap-pick";
     if(swapPick && swapPick.key===m.key && swapPick.which===which) cls+=" swap-selected";
-    return `<div class="${cls}" onclick="pickSwap('${m.key}','${which}')"><span class="nm">${p?esc(p.name):"🡐 Place libre"}</span></div>`;
+    return `<div class="${cls}" onclick="pickSwap('${m.key}','${which}')"><span class="nm">${esc(p.name)}</span></div>`;
   }
   const isFF=ffSide(game,m.key)===which;
   const scoreCellFF=(p&&other)?`<span class="score"${isFF?' style="color:var(--danger)"':''}>${isFF?"F":sc}</span>`:"";
@@ -3163,7 +3165,7 @@ function toggleSwap(){
   swapMode=!swapMode; swapPick=null;
   $("#swapBtn").style.background = swapMode ? "linear-gradient(180deg,var(--jaune-2),var(--jaune))" : "";
   $("#swapBtn").style.color = swapMode ? "#1a0b2e" : "";
-  if(swapMode) toast("Mode échange ON : clique sur un joueur (dans n'importe quel tour), puis sur sa destination (autre joueur, ou place libre du 1er tour).");
+  if(swapMode) toast("Mode échange ON : clique sur un joueur, puis sur un autre — ils permutent leurs places. Pour réorganiser les exemptions en profondeur, utilise 🧩 Placement.");
   renderAdminBracket();
 }
 async function pickSwap(key,which){
@@ -3746,18 +3748,34 @@ function layoutBracketTree(bk){
       c.feeders[i]=list.length?list:null;
     });
   });
+  // 2bis) matchs préliminaires façon start.gg : un match SANS source, cité comme
+  // feeder par un match d'une colonne PLUS DENSE, est "différé" — au lieu de
+  // s'empiler en haut de sa colonne, il sera placé EN FACE de son consommateur
+  // (ex. le match B du Tour 1 face à son match G du Tour 2 ; un LB1 face à son
+  // LB2). La colonne dense sert alors de base d'empilement.
+  const consumer=cols.map(c=>c.matches.map(()=>null));
+  cols.forEach((c,ci)=>c.matches.forEach((m,i)=>{
+    (c.feeders[i]||[]).forEach(([fc,fi])=>{ if(consumer[fc]) consumer[fc][fi]=[ci,i]; });
+  }));
+  const deferred=cols.map((c,ci)=>c.matches.map((m,i)=>{
+    const f=c.feeders[i]; if(f&&f.length) return false;
+    const co=consumer[ci][i]; if(!co) return false;
+    return c.matches.length<cols[co[0]].matches.length;
+  }));
   // positions souhaitées (coordonnées : haut de colonne ; les colonnes sont alignées en haut)
   const TOP=cols.map(()=>[]), CTR=cols.map(()=>[]);
   cols.forEach((c,ci)=>{
     const linked = ci>0 && c.feeders.some(f=>f&&f.length);
     let cursor=BASE[ci];
     for(let i=0;i<c.matches.length;i++){
+      if(deferred[ci][i]){ TOP[ci][i]=null; CTR[ci][i]=null; continue; } // placé plus bas
       let top;
       const f=ci>0?c.feeders[i]:null;
       if(f && f.length){
-        // centre = moyenne des centres des manches sources
+        // centre = moyenne des centres des manches sources ; si toutes les
+        // sources sont différées (pas encore placées), on empile simplement
         let sum=0,cnt=0; f.forEach(([fc,fi])=>{ if(CTR[fc]&&CTR[fc][fi]!=null){ sum+=CTR[fc][fi]; cnt++; } });
-        top=(cnt?sum/cnt:cursor)-H[ci][i]/2;
+        top=cnt?(sum/cnt-H[ci][i]/2):cursor;
       }else{
         top=cursor;
       }
@@ -3771,8 +3789,37 @@ function layoutBracketTree(bk){
   // colonne (ce qui désalignerait les liaisons), on décale TOUT l'arbre d'un bloc
   const SLACK=6; // remontée tolérée dans la marge du titre (14px) sans gêner l'étiquette FT
   let shift=0;
-  cols.forEach((c,ci)=>{ if(c.matches.length) shift=Math.max(shift,(BASE[ci]-SLACK)-TOP[ci][0]); });
-  if(shift>0) cols.forEach((c,ci)=>c.matches.forEach((m,i)=>{ TOP[ci][i]+=shift; CTR[ci][i]+=shift; }));
+  cols.forEach((c,ci)=>{ for(let i=0;i<c.matches.length;i++){ if(TOP[ci][i]!=null){ shift=Math.max(shift,(BASE[ci]-SLACK)-TOP[ci][i]); break; } } });
+  if(shift>0) cols.forEach((c,ci)=>c.matches.forEach((m,i)=>{ if(TOP[ci][i]!=null){ TOP[ci][i]+=shift; CTR[ci][i]+=shift; } }));
+  // placement des différés : en face de leur consommateur (sa moitié/portion si
+  // plusieurs feeders), puis passe anti-chevauchement où seuls les différés bougent
+  cols.forEach((c,ci)=>{
+    let any=false;
+    c.matches.forEach((mm,i)=>{
+      if(!deferred[ci][i]) return;
+      any=true;
+      const [cj,j]=consumer[ci][i];
+      const fl=cols[cj].feeders[j]||[];
+      let myIdx=fl.findIndex(ff=>ff[0]===ci&&ff[1]===i); if(myIdx<0) myIdx=0;
+      const nf=Math.max(1,fl.length);
+      const base=(TOP[cj][j]!=null?TOP[cj][j]:BASE[cj]);
+      const center=base+(myIdx+0.5)*H[cj][j]/nf;
+      TOP[ci][i]=center-H[ci][i]/2;
+    });
+    if(!any) return;
+    let cursor=BASE[ci]-SLACK;
+    for(let i=0;i<c.matches.length;i++){
+      if(TOP[ci][i]==null) TOP[ci][i]=cursor;
+      if(deferred[ci][i]){
+        let nextFixed=null;
+        for(let j=i+1;j<c.matches.length;j++){ if(!deferred[ci][j]&&TOP[ci][j]!=null){ nextFixed=TOP[ci][j]; break; } }
+        if(nextFixed!=null) TOP[ci][i]=Math.min(TOP[ci][i],nextFixed-BK_MIN-H[ci][i]);
+        TOP[ci][i]=Math.max(TOP[ci][i],cursor);
+      }
+      CTR[ci][i]=TOP[ci][i]+H[ci][i]/2;
+      cursor=TOP[ci][i]+H[ci][i]+BK_MIN;
+    }
+  });
   // 3) application via les marges (le flux normal est conservé ; la 1re marge peut
   //    être légèrement négative — voulu, dans la limite de SLACK)
   cols.forEach((c,ci)=>{
