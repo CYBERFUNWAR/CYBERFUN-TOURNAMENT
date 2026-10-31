@@ -213,6 +213,8 @@
   .bk-svg path{fill:none;stroke:var(--line);stroke-width:1.5;stroke-linecap:square}
   @media(max-width:520px){.round{min-width:178px;padding:0 16px}}
   .ft-tag{position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:9px;font-family:'Orbitron',sans-serif;letter-spacing:1px;background:var(--violet-dk);color:#fff;padding:2px 8px;border-radius:6px;border:1px solid var(--violet);white-space:nowrap;z-index:2;box-shadow:0 0 8px rgba(0,0,0,.5)}
+  /* identifiant de match façon start.gg (A, B, C…) : pastille sur le bord gauche */
+  .m-letter{position:absolute;left:-9px;top:50%;transform:translateY(-50%);min-width:20px;text-align:center;font-size:10px;font-family:'Orbitron',sans-serif;font-weight:700;background:#17102a;color:var(--jaune);padding:3px 4px;border-radius:5px;border:1px solid var(--violet);z-index:3;box-shadow:0 0 6px rgba(0,0,0,.6)}
   .slot{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:13.5px;border-bottom:1px solid var(--line);transition:.15s;gap:8px;background:var(--panel-2);position:relative;z-index:1}
   .slot:first-child{border-radius:10px 10px 0 0}
   .slot:last-child{border-bottom:0;border-radius:0 0 10px 10px}
@@ -2104,29 +2106,32 @@ function rmatch(bk,key,p1,p2,s1,s2){
 }
 function resolve(bk){
   const size=bk.size,k=Math.log2(size),wb=[];
+  // m.src = provenance de chaque côté [{r:'w'|'l', k:cléDuMatchSource}, ...] :
+  // sert à l'affichage « Gagnant de A » / « Perdant de J » façon start.gg
   let r0=[];for(let m=0;m<size/2;m++)r0.push(rmatch(bk,`wb-0-${m}`,bk.slots[2*m],bk.slots[2*m+1]));wb.push(r0);
-  for(let r=1;r<k;r++){const prev=wb[r-1],rr=[];for(let m=0;m<prev.length/2;m++)rr.push(rmatch(bk,`wb-${r}-${m}`,prev[2*m].winner,prev[2*m+1].winner,prev[2*m].settled,prev[2*m+1].settled));wb.push(rr);}
+  for(let r=1;r<k;r++){const prev=wb[r-1],rr=[];for(let m=0;m<prev.length/2;m++){const mm=rmatch(bk,`wb-${r}-${m}`,prev[2*m].winner,prev[2*m+1].winner,prev[2*m].settled,prev[2*m+1].settled);mm.src=[{r:'w',k:prev[2*m].key},{r:'w',k:prev[2*m+1].key}];rr.push(mm);}wb.push(rr);}
   const wbChamp=wb[k-1][0].winner;
   if(bk.type==="single"){return{type:"single",champion:wbChamp,groups:[{label:null,columns:wb.map((round,r)=>({title:roundName(r,k),matches:round}))}]};}
   const lb=[];const los0=wb[0].map(mm=>mm.loser);const los0S=wb[0].map(mm=>mm.settled);
-  let l0=[];for(let m=0;m<los0.length/2;m++)l0.push(rmatch(bk,`lb-0-${m}`,los0[2*m],los0[2*m+1],los0S[2*m],los0S[2*m+1]));lb.push(l0);
+  let l0=[];for(let m=0;m<los0.length/2;m++){const mm=rmatch(bk,`lb-0-${m}`,los0[2*m],los0[2*m+1],los0S[2*m],los0S[2*m+1]);mm.src=[{r:'l',k:wb[0][2*m].key},{r:'l',k:wb[0][2*m+1].key}];l0.push(mm);}lb.push(l0);
   const totalLB=2*(k-1);
   for(let idx=1;idx<totalLB;idx++){const prevW=lb[idx-1].map(mm=>mm.winner),prevS=lb[idx-1].map(mm=>mm.settled),round=[];
-    if(idx%2===1){const wbN=(idx+3)/2;let drops=wb[wbN-1].map(mm=>mm.loser),dropsS=wb[wbN-1].map(mm=>mm.settled);
+    if(idx%2===1){const wbN=(idx+3)/2;let drops=wb[wbN-1].map(mm=>mm.loser),dropsS=wb[wbN-1].map(mm=>mm.settled),dropK=wb[wbN-1].map(mm=>mm.key);
       // Croisement anti-rematch (brackets générés avec lbCross) : les perdants du WB sont
       // insérés en ordre croisé pour ne pas retomber sur des joueurs déjà affrontés.
       // Alternance classique des TO : inversion complète, puis échange de moitiés.
       if(bk.lbCross && drops.length>1){
         const dr=(idx-1)/2;
-        if(dr%2===0){ drops=drops.slice().reverse(); dropsS=dropsS.slice().reverse(); }
-        else { const h=drops.length/2; drops=[...drops.slice(h),...drops.slice(0,h)]; dropsS=[...dropsS.slice(h),...dropsS.slice(0,h)]; }
+        if(dr%2===0){ drops=drops.slice().reverse(); dropsS=dropsS.slice().reverse(); dropK=dropK.slice().reverse(); }
+        else { const h=drops.length/2; drops=[...drops.slice(h),...drops.slice(0,h)]; dropsS=[...dropsS.slice(h),...dropsS.slice(0,h)]; dropK=[...dropK.slice(h),...dropK.slice(0,h)]; }
       }
-      for(let m=0;m<prevW.length;m++)round.push(rmatch(bk,`lb-${idx}-${m}`,prevW[m],drops[m],prevS[m],dropsS[m]));}
-    else{for(let m=0;m<prevW.length/2;m++)round.push(rmatch(bk,`lb-${idx}-${m}`,prevW[2*m],prevW[2*m+1],prevS[2*m],prevS[2*m+1]));}
+      for(let m=0;m<prevW.length;m++){const mm=rmatch(bk,`lb-${idx}-${m}`,prevW[m],drops[m],prevS[m],dropsS[m]);mm.src=[{r:'w',k:lb[idx-1][m].key},{r:'l',k:dropK[m]}];round.push(mm);}}
+    else{for(let m=0;m<prevW.length/2;m++){const mm=rmatch(bk,`lb-${idx}-${m}`,prevW[2*m],prevW[2*m+1],prevS[2*m],prevS[2*m+1]);mm.src=[{r:'w',k:lb[idx-1][2*m].key},{r:'w',k:lb[idx-1][2*m+1].key}];round.push(mm);}}
     lb.push(round);}
   const lbChamp=lb[lb.length-1][0].winner;const lbS=lb[lb.length-1][0].settled;const wbS=wb[k-1][0].settled;
   const g0=rmatch(bk,"gf-0",wbChamp,lbChamp,wbS,lbS),gf=[g0];let champion=g0.winner;
-  if(g0.winner&&lbChamp&&g0.winner.id===lbChamp.id){const g1=rmatch(bk,"gf-1",wbChamp,lbChamp);gf.push(g1);champion=g1.winner;}
+  g0.src=[{r:'w',k:wb[k-1][0].key},{r:'w',k:lb[totalLB-1][0].key}];
+  if(g0.winner&&lbChamp&&g0.winner.id===lbChamp.id){const g1=rmatch(bk,"gf-1",wbChamp,lbChamp);g1.src=[{r:'w',k:'gf-0'},{r:'l',k:'gf-0'}];gf.push(g1);champion=g1.winner;}
   const wbCols=wb.map((round,r)=>({title:roundName(r,k),matches:round}));if(wbCols.length)wbCols[wbCols.length-1].title="Finale WB";
   const lbCols=lb.map((round,i)=>({title:(i===lb.length-1?"Finale LB":"LB "+(i+1)),matches:round}));
   return{type:"double",champion,groups:[
@@ -2633,12 +2638,40 @@ function bracketHTML(game,editable){
   // plusieurs colonnes de là (data-feeders "col:idx", lu par le moteur de
   // layout). En mode échange on ré-affiche TOUT (places libres = destinations).
   const collapse=!swapMode;
-  let visKey=null;
+  let visKey=null, probePot=null, letters=null, matchByKey=null, sideLabel=null;
   if(collapse){
     const probe={type:bk.type,size:bk.size,ft:1,ftFinal:0,lbCross:bk.lbCross,slots:bk.slots,
       scores:new Proxy({},{get:()=>({a:1,b:0})})};
-    visKey={};
-    resolve(probe).groups.forEach(pg=>pg.columns.forEach(pc=>pc.matches.forEach(pm=>{ visKey[pm.key]=!!(pm.p1&&pm.p2); })));
+    visKey={}; probePot={};
+    resolve(probe).groups.forEach(pg=>pg.columns.forEach(pc=>pc.matches.forEach(pm=>{
+      visKey[pm.key]=!!(pm.p1&&pm.p2);
+      probePot[pm.key]=pm.p1?1:(pm.p2?2:0); // côté potentiellement occupé d'une exemption
+    })));
+    // ----- lettres de match façon start.gg (A, B, C… puis AA, AB…) ----------
+    // attribuées aux matchs VISIBLES, dans l'ordre : Winners, Grande Finale
+    // (reset compris, réservé d'avance pour que les lettres ne bougent jamais),
+    // puis Losers. Indépendantes des résultats -> stables toute la soirée.
+    const letterName=i=>{ let s=''; i++; while(i>0){ i--; s=String.fromCharCode(65+i%26)+s; i=Math.floor(i/26); } return s; };
+    const seq=[];
+    const groupOrder = res.groups.length===3 ? [res.groups[0],res.groups[2],res.groups[1]] : res.groups;
+    groupOrder.forEach(gg=>gg.columns.forEach(cc=>cc.matches.forEach(mm=>{ if(visKey[mm.key]!==false) seq.push(mm.key); })));
+    if(bk.type==="double" && seq.indexOf('gf-1')<0){ const gi=seq.indexOf('gf-0'); if(gi>=0) seq.splice(gi+1,0,'gf-1'); }
+    letters={}; seq.forEach((kk,i)=>letters[kk]=letterName(i));
+    matchByKey={};
+    res.groups.forEach(gg=>gg.columns.forEach(cc=>cc.matches.forEach(mm=>{ matchByKey[mm.key]=mm; })));
+    // étiquette de provenance d'une case vide : « Gagnant de X » / « Perdant de X »,
+    // en remontant à travers les exemptions masquées jusqu'au vrai match source
+    sideLabel=(src)=>{
+      let s=src, guard=0;
+      while(s && guard++<32){
+        if(visKey[s.k]!==false) return (s.r==='l'?'Perdant de ':'Gagnant de ')+(letters[s.k]||'?');
+        if(s.r==='l') return null; // un match masqué ne produit jamais de perdant
+        const hm=matchByKey[s.k], side=probePot[s.k]||0;
+        if(!hm||!side||!hm.src) return null;
+        s=hm.src[side-1];
+      }
+      return null;
+    };
   }
   res.groups.forEach(g=>{
     // clé absente de la sonde (ex. reset de grande finale gf-1) : visible
@@ -2668,10 +2701,12 @@ function bracketHTML(game,editable){
     if(collapse && !colShown.some(x=>x)) return; // groupe sans aucun match à montrer
     if(g.label) html+=`<div class="bracket-group-label">${g.label}</div>`;
     html+='<div class="bracket-scroll"><div class="bracket">';
+    let lbN=0; // renumérotation des tours LB rendus (LB 1, LB 2…) quand des tours sont repliés
     g.columns.forEach((col,ci)=>{
       if(collapse && !colShown[ci]) return; // colonne sans match visible : sautée
+      const title=(collapse && /^LB \d+$/.test(col.title)) ? ("LB "+(++lbN)) : col.title;
       html+=`<div class="round">`;
-      html+=`<div class="round-title">${col.title}</div>`;
+      html+=`<div class="round-title">${title}</div>`;
       col.matches.forEach((m,mi)=>{
         if(collapse && !vis[ci][mi]) return; // exemption / branche morte : masquée
         // routage explicite des connecteurs ("col rendue:idx rendu") ;
@@ -2681,6 +2716,11 @@ function bracketHTML(game,editable){
           const fl=visFeeders(ci,mi).map(([c,f])=>rCol[c]+":"+rIdx[c][f]);
           fd=' data-feeders="'+(fl.length?fl.join(","):"-")+'"';
         }
+        const letter=collapse?(letters[m.key]||""):"";
+        const letterTag=letter?`<span class="m-letter">${letter}</span>`:"";
+        // étiquettes de provenance des cases encore vides (façon start.gg)
+        const lbl1=(collapse && !m.p1 && m.src)?sideLabel(m.src[0]):null;
+        const lbl2=(collapse && !m.p2 && m.src)?sideLabel(m.src[1]):null;
         const ftTag=(m.p1&&m.p2)?`<span class="ft-tag">FT${ftFor(bk,m.key)}</span>`:"";
         // numéro de poste/table : saisie pour admin+mod (matchs jouables), étiquette en lecture sinon
         const stv=((bk.stations||{})[m.key]||"");
@@ -2690,7 +2730,7 @@ function bracketHTML(game,editable){
           ? `<div class="station-edit">🖥<input value="${esc(stv)}" placeholder="poste" maxlength="6" onchange="setStation('${game}','${m.key}',this.value)">${liveBtnHTML(game,m.key,bk)}</div>`
           : (stv && !m.winner ? `<div class="station-tag">🖥 Poste ${esc(stv)}</div>` : "");
         const liveTag=isLive?'<span class="live-tag">🔴 EN COURS</span>':'';
-        html+='<div class="match'+(isLive?' live':'')+(ghost?' ghost':'')+'"'+fd+' data-mkey="'+esc(m.key)+'">'+liveTag+ftTag+slotHTML(game,m,"p1",editable)+slotHTML(game,m,"p2",editable)+station+'</div>';
+        html+='<div class="match'+(isLive?' live':'')+(ghost?' ghost':'')+'"'+fd+' data-mkey="'+esc(m.key)+'">'+liveTag+letterTag+ftTag+slotHTML(game,m,"p1",editable,lbl1)+slotHTML(game,m,"p2",editable,lbl2)+station+'</div>';
       });
       html+='</div>';
     });
@@ -2700,7 +2740,7 @@ function bracketHTML(game,editable){
   html+=standingsHTML(game);
   return html;
 }
-function slotHTML(game,m,which,editable){
+function slotHTML(game,m,which,editable,srcLbl){
   const p=m[which],other=which==="p1"?m.p2:m.p1;
   // surbrillance "vainqueur" UNIQUEMENT si les 2 joueurs sont connus (évite l'annonce
   // prématurée due à l'avance automatique quand l'adversaire n'est pas encore déterminé)
@@ -2719,7 +2759,7 @@ function slotHTML(game,m,which,editable){
   const isFF=ffSide(game,m.key)===which;
   const scoreCellFF=(p&&other)?`<span class="score"${isFF?' style="color:var(--danger)"':''}>${isFF?"F":sc}</span>`:"";
   const btns=active?`<span class="sc-btns"><button onclick="bump('${game}','${m.key}','${which}',1)">▲</button><button onclick="bump('${game}','${m.key}','${which}',-1)">▼</button><button class="ff" onclick="forfait('${game}','${m.key}','${which}')" title="Déclarer forfait / DQ" style="color:var(--danger)">⚑</button></span>`:"";
-  return `<div class="${cls}"><span class="nm">${p?esc(p.name):"À déterminer"}</span>${scoreCellFF}${btns}</div>`;
+  return `<div class="${cls}"><span class="nm">${p?esc(p.name):(srcLbl||"À déterminer")}</span>${scoreCellFF}${btns}</div>`;
 }
 function bracketHasScores(bk){ if(!bk||!bk.scores) return false; for(const k in bk.scores){ const s=bk.scores[k]; if((s.a||0)>0||(s.b||0)>0) return true; } return false; }
 function raceHasScores(bk){ const R=bk&&bk.results; if(!R) return false; for(const k in R){ if(R[k].closed) return true; for(const race of (R[k].races||[])){ for(const pid in race){ if((race[pid].pts||0)>0||race[pid].pos) return true; } } } return false; }
