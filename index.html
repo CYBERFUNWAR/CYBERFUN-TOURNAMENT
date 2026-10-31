@@ -3214,7 +3214,7 @@ function editPlacement(){
   const order=seedOrder(bk.size);
   const pairs=[]; bk.slots.forEach((p,i)=>{ if(p) pairs.push({seed:order[i],p}); });
   pairs.sort((a,b)=>a.seed-b.seed);
-  _placeDraft={ game, size:bk.size, list:pairs.map(x=>x.p) };
+  _placeDraft={ game, size:bk.size, list:pairs.map(x=>x.p), removed:[] };
   renderPlacement();
 }
 function _placePreview(list,size){
@@ -3236,6 +3236,7 @@ function renderPlacement(){
       <span style="display:flex;gap:6px">
         <button class="btn ghost sm" style="padding:4px 12px" ${i===0?"disabled":""} onclick="placeMove(${i},-1)">▲</button>
         <button class="btn ghost sm" style="padding:4px 12px" ${i===d.list.length-1?"disabled":""} onclick="placeMove(${i},1)">▼</button>
+        <button class="btn ghost sm" style="padding:4px 10px;color:var(--danger);border-color:var(--danger)" onclick="placeRemove(${i})" title="Retirer du bracket (absent) — l'inscription est conservée">✖</button>
       </span>
     </div>`).join("");
   const pv=_placePreview(d.list,d.size);
@@ -3245,15 +3246,30 @@ function renderPlacement(){
   const exHTML=pv.exempts.length
     ? pv.exempts.map(p=>`<span class="badge" style="opacity:.65">${esc(p.name)}</span>`).join(" ")
     : '<span class="sub">aucun</span>';
+  const remHTML=(d.removed&&d.removed.length)
+    ? `<div style="margin-top:8px"><div class="sub" style="font-size:11px;margin-bottom:4px">🚪 Retirés du bracket (inscription conservée — clic pour remettre) :</div>${d.removed.map((p,i)=>`<button class="btn ghost sm" style="padding:3px 10px;opacity:.8" onclick="placeRestore(${i})">↩ ${esc(p.name)}</button>`).join(" ")}</div>`
+    : "";
   openModal("🧩 Placement — "+esc(d.game), `
-    <p class="sub" style="font-size:12px;margin-top:0">Réordonne la liste : <b>1 = tête de série</b>. Les premiers reçoivent les exemptions, les derniers s'affrontent au 1er tour (1 contre le dernier, 2 contre l'avant-dernier…). L'arbre est reconstruit proprement — jamais deux places libres face à face.</p>
+    <p class="sub" style="font-size:12px;margin-top:0">Réordonne la liste : <b>1 = tête de série</b>. Les premiers reçoivent les exemptions, les derniers s'affrontent au 1er tour (1 contre le dernier, 2 contre l'avant-dernier…). <b>✖</b> retire un absent : l'arbre est reconstruit sans lui et les exemptions se redistribuent. Rien n'est enregistré avant « Appliquer ».</p>
     <div style="max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px">${rows}</div>
+    ${remHTML}
     <div style="margin-top:12px"><div class="sub" style="font-size:11px;margin-bottom:4px">⚔ Matchs du 1er tour :</div>${duelsHTML}</div>
     <div style="margin-top:8px"><div class="sub" style="font-size:11px;margin-bottom:4px">⏭ Exemptés (entrent au tour suivant) :</div>${exHTML}</div>
     <div style="display:flex;gap:10px;margin-top:16px">
       <button class="btn sm" onclick="confirmPlacement()">✓ Appliquer ce placement</button>
       <button class="btn ghost sm" onclick="closeModal();_placeDraft=null">Annuler</button>
     </div>`);
+}
+function placeRemove(i){
+  const d=_placeDraft; if(!d) return;
+  if(d.list.length<=2) return toast("Il faut garder au moins 2 joueurs dans le bracket.",true);
+  d.removed.push(d.list.splice(i,1)[0]);
+  renderPlacement();
+}
+function placeRestore(i){
+  const d=_placeDraft; if(!d) return;
+  d.list.push(d.removed.splice(i,1)[0]);
+  renderPlacement();
 }
 function placeMove(i,dir){
   const d=_placeDraft; if(!d) return;
@@ -3274,6 +3290,7 @@ async function confirmPlacement(){
   }catch(e){ console.error(e); toast("Erreur d'enregistrement.",true); }
 }
 window.editPlacement=editPlacement; window.placeMove=placeMove; window.confirmPlacement=confirmPlacement;
+window.placeRemove=placeRemove; window.placeRestore=placeRestore;
 
 /* ---------- intégrer un retardataire dans un bracket DÉJÀ généré ----------
    Place un inscrit absent de l'arbre sur une place libre du 1er tour, sans tout
@@ -4368,17 +4385,23 @@ function regieMatchListHTML(data, banner){
       const ns=compact?"clamp(15px,1.7vw,24px)":"clamp(20px,2.6vw,36px)";
       const bg=waiting==="live"?"rgba(255,77,109,.10)":(waiting?"rgba(255,226,61,.06)":"rgba(77,255,161,.08)");
       const bd=waiting==="live"?"rgba(255,77,109,.5)":(waiting?"rgba(255,226,61,.35)":"rgba(77,255,161,.3)");
-      const stationCell=`<span style="min-width:${compact?"90px":"120px"};text-align:right">${m.station?`<b style="display:block;font-size:${compact?"clamp(13px,1.5vw,20px)":"clamp(15px,1.9vw,26px)"};color:#4dffa1">🖥 Poste ${esc(m.station)}</b>`:""}<span style="font-size:clamp(10px,1.1vw,14px);color:#a855f7">${esc(m.round)}</span></span>`;
-      const pad=compact?"9px 16px":"14px 22px";
+      const pad=compact?"9px 14px":"12px 20px";
+      // tour + poste sur une ligne d'en-tête : les pseudos gardent TOUTE la largeur
+      const meta=`<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px${(m.station||m.round)?";margin-bottom:4px":""}">
+        <span style="font-size:clamp(10px,1.1vw,14px);color:#a855f7">${esc(m.round)}</span>
+        ${m.station?`<b style="font-size:${compact?"clamp(13px,1.5vw,20px)":"clamp(15px,1.9vw,26px)"};color:#4dffa1;white-space:nowrap">🖥 Poste ${esc(m.station)}</b>`:""}
+      </div>`;
       if(m.players){
-        const names=m.players.map(n=>`<span style="font-weight:700;font-size:${ns}">${esc(n)}</span>`).join('<span style="color:#ffe23d;font-family:\'Orbitron\',sans-serif;font-size:clamp(11px,1.2vw,16px);padding:0 4px">·</span>');
-        return `<div style="display:flex;align-items:center;gap:12px;background:${bg};border:1px solid ${bd};border-radius:14px;padding:${pad}">
-          <span style="flex:1;display:flex;flex-wrap:wrap;gap:6px;align-items:center">${names}</span>${stationCell}</div>`;
+        const names=m.players.map(n=>`<span style="font-weight:700;font-size:${ns};overflow-wrap:anywhere">${esc(n)}</span>`).join('<span style="color:#ffe23d;font-family:\'Orbitron\',sans-serif;font-size:clamp(11px,1.2vw,16px);padding:0 4px">·</span>');
+        return `<div style="background:${bg};border:1px solid ${bd};border-radius:14px;padding:${pad}">${meta}
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">${names}</div></div>`;
       }
-      return `<div style="display:flex;align-items:center;gap:12px;background:${bg};border:1px solid ${bd};border-radius:14px;padding:${pad}">
-        <span style="flex:1;text-align:right;font-size:${ns};font-weight:700">${esc(m.a)}</span>
-        <span style="font-size:clamp(12px,1.3vw,18px);color:#ffe23d;font-family:'Orbitron',sans-serif">VS</span>
-        <span style="flex:1;font-size:${ns};font-weight:700">${esc(m.b)}</span>${stationCell}</div>`;
+      return `<div style="background:${bg};border:1px solid ${bd};border-radius:14px;padding:${pad}">${meta}
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="flex:1;min-width:0;text-align:right;font-size:${ns};font-weight:700;overflow-wrap:anywhere">${esc(m.a)}</span>
+          <span style="flex:none;font-size:clamp(12px,1.3vw,18px);color:#ffe23d;font-family:'Orbitron',sans-serif">VS</span>
+          <span style="flex:1;min-width:0;font-size:${ns};font-weight:700;overflow-wrap:anywhere">${esc(m.b)}</span>
+        </div></div>`;
     };
     const colHTML=(title,color,list,waiting)=>{
       const compact=list.length>4;
