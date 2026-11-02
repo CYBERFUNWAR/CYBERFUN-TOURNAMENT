@@ -765,7 +765,7 @@ function toast(m,err=false){const t=$("#toast");t.textContent=m;t.className="toa
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("load "+src));document.head.appendChild(s);});}
 
 Object.assign(window,{$,go,lookupMe,cancelMe,adminTryLogin,adminLogout,renderAdminTable,exportCSV,
-  playerLogin,playerLogout,forgotPassword,saveMyProfile,myAvatarPick,
+  playerLogin,playerLogout,forgotPassword,createMyAccount,saveMyProfile,myAvatarPick,
   setFmt,onBrkGameChange,genBracket,clearBracket,bump,editReg,delReg,addGame,rmGame,saveSettings,
   exportBracketPDF,exportPodiumImage,addPlayerManual,makeQR,downloadQR,copyEmails,shuffleBracket,toggleSwap,pickSwap,
   closeTournament,renderAdminLigue,deleteSeason,toggleBracketVisibility,updatePriceRecap,togglePaid,togglePresent,
@@ -1034,6 +1034,7 @@ async function loadPlayerProfile(){
 async function loadMyRegs(){
   myRegs=[];
   if(!playerUser) return;
+  await adoptMyRegs(); // d'abord relier les éventuelles fiches d'avant le compte
   try{
     const qs=await getDocs(query(collection(db,"registrations"), where("uid","==",playerUser.uid)));
     myRegs=qs.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0));
@@ -1072,6 +1073,67 @@ async function forgotPassword(){
   if(!email.includes("@")) return;
   try{ await sendPasswordResetEmail(auth,email.trim()); toast("E-mail de réinitialisation envoyé — vérifie aussi tes spams."); }
   catch(e){ console.error(e); toast("Impossible d'envoyer l'e-mail (adresse inconnue ?).",true); }
+}
+
+/* ---- création de compte SEULE (sans inscription à un tournoi) ----
+   Pour les joueurs inscrits avant l'ouverture des comptes : ils créent leur
+   espace ici, et leurs inscriptions existantes (même e-mail, fiche sans uid)
+   sont automatiquement reliées au compte via adoptMyRegs(). */
+async function createMyAccount(){
+  if(DEMO) return toast("Mode démo : pas de comptes joueurs.",true);
+  const pseudo=($("#caPseudo")?.value||"").trim();
+  const email=($("#caEmail")?.value||"").trim();
+  const p1=$("#caPass")?.value||"", p2=$("#caPass2")?.value||"";
+  if(!pseudo) return toast("Choisis ton pseudo / gamertag.",true);
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("E-mail invalide.",true);
+  if(p1.length<6) return toast("Mot de passe : 6 caractères minimum.",true);
+  if(p1!==p2) return toast("Les deux mots de passe ne correspondent pas.",true);
+  try{ const pm=await getDoc(doc(db,"pseudos",pseudoKey(pseudo))); if(pm.exists()) return toast("Ce pseudo appartient déjà à un compte. Si c'est le tien, connecte-toi ou fais « Mot de passe oublié ? ».",true); }catch(e){}
+  if(window._caBusy) return; window._caBusy=true;
+  try{
+    let uid;
+    try{
+      const cred=await createUserWithEmailAndPassword(auth,email,p1);
+      uid=cred.user.uid;
+    }catch(err){
+      const ec=String(err&&err.code);
+      if(ec.includes("email-already-in-use")) return toast("Un compte existe déjà avec cet e-mail — connecte-toi, ou fais « Mot de passe oublié ? ».",true);
+      if(ec.includes("weak-password")) return toast("Mot de passe trop faible (6 caractères minimum).",true);
+      if(ec.includes("invalid-email")) return toast("E-mail invalide.",true);
+      console.error(err); return toast("Impossible de créer le compte — réessaie.",true);
+    }
+    const prof={pseudo,prenom:"",nom:"",ville:"",telephone:"",birthdate:"",email,avatar:"",createdAt:Date.now()};
+    try{
+      await setDoc(doc(db,"players",uid),prof);
+      await setDoc(doc(db,"pseudos",pseudoKey(pseudo)),{uid,email});
+    }catch(err){ console.error("profil",err); }
+    playerUser=auth.currentUser; playerProfile={uid,...prof};
+    await loadMyRegs(); // relie aussi les inscriptions d'avant le compte (même e-mail)
+    renderProfileView(); renderRegIdentity();
+    toast("Compte créé ✓ — complète ton profil (prénom, ville, date de naissance). 🎮");
+  }catch(err){ console.error(err); toast("Erreur lors de la création du compte.",true); }
+  finally{ window._caBusy=false; }
+}
+
+/* relie au compte les inscriptions faites AVANT la création du compte :
+   fiches au même e-mail et SANS uid (nécessite les règles v3.1 — list/update
+   par e-mail du compte). Une fois par session et par compte. */
+let _adoptedFor=null;
+async function adoptMyRegs(){
+  if(!playerUser||DEMO||_adoptedFor===playerUser.uid) return;
+  _adoptedFor=playerUser.uid;
+  const em=(playerUser.email||"").trim(); if(!em) return;
+  let n=0;
+  for(const v of [...new Set([em,em.toLowerCase()])]){
+    try{
+      const qs=await getDocs(query(collection(db,"registrations"),where("email","==",v)));
+      for(const d of qs.docs){
+        if(d.data().uid) continue;
+        try{ await updateDoc(doc(db,"registrations",d.id),{uid:playerUser.uid}); n++; }catch(e){ console.error("adoption",e); }
+      }
+    }catch(e){ /* règles pas encore publiées : réessaiera à la prochaine session */ _adoptedFor=null; }
+  }
+  if(n) toast(n>1?n+" inscriptions existantes reliées à ton compte ✓":"Ton inscription existante a été reliée à ton compte ✓");
 }
 
 /* avatar : image locale → redimensionnée (160px, JPEG) → stockée dans le profil */
@@ -1605,7 +1667,19 @@ function renderProfileView(){
         <button class="btn" onclick="playerLogin()">Se connecter ▸</button>
         <a onclick="forgotPassword()" style="cursor:pointer;color:var(--cyan);font-size:12px;text-decoration:underline dotted">Mot de passe oublié ?</a>
       </div>
-      <div class="notice" style="margin-top:16px">✨ <b>Pas encore de compte ?</b> Il se crée automatiquement lors de ta <b>première inscription à un tournoi</b> (page « S'inscrire ») : tu y choisis ton mot de passe.</div>
+    </div>
+    <div class="panel" style="margin-top:16px">
+      <b style="font-size:13px">✨ Pas encore de compte ? Crée-le ici</b>
+      <p class="sub" style="font-size:12px;margin:6px 0 10px">Tu étais <b>déjà inscrit à un tournoi</b> avant l'arrivée des comptes ? Utilise le <b style="color:var(--jaune)">même e-mail</b> que ton inscription : ta fiche sera automatiquement reliée à ton compte. (Sinon, le compte se crée aussi tout seul lors d'une première inscription.)</p>
+      <div class="grid2">
+        <div class="field"><label>Pseudo / Gamertag</label><input id="caPseudo" maxlength="40" placeholder="TonPseudo"></div>
+        <div class="field"><label>E-mail</label><input id="caEmail" autocomplete="email" placeholder="toi@mail.com"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Mot de passe (6 caractères min.)</label><input id="caPass" type="password" autocomplete="new-password" placeholder="••••••••"></div>
+        <div class="field"><label>Confirme le mot de passe</label><input id="caPass2" type="password" autocomplete="new-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')createMyAccount()"></div>
+      </div>
+      <button class="btn sm" onclick="createMyAccount()">Créer mon compte ▸</button>
     </div>`+legacyLookupHTML(false);
     return;
   }
